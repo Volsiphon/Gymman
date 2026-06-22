@@ -250,7 +250,7 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
           </Text>
           <TouchableOpacity
             style={[styles.continueBtn, { marginTop: spacing.xl }]}
-            onPress={() => navigation.navigate('StatsReveal')}
+            onPress={() => navigation.navigate('StatsReveal', { stats, goalText })}
             activeOpacity={0.85}
           >
             <Text style={styles.continueBtnText}>Continue anyway</Text>
@@ -360,7 +360,7 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
 
               <TouchableOpacity
                 style={styles.choiceCard}
-                onPress={() => navigation.navigate('StatsReveal')}
+                onPress={() => navigation.navigate('StatsReveal', { stats, goalText })}
                 activeOpacity={0.85}
               >
                 <Ionicons name="flame-outline" size={20} color={colors.primaryLight} />
@@ -445,7 +445,7 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
         <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
           <TouchableOpacity
             style={styles.continueBtn}
-            onPress={() => navigation.navigate('StatsReveal')}
+            onPress={() => navigation.navigate('StatsReveal', { stats, goalText })}
             activeOpacity={0.85}
           >
             <Text style={styles.continueBtnText}>Build my plan</Text>

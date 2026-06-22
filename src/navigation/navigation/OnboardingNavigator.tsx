@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { LanguageSelectionScreen, LoginScreen, PhysicalStatsScreen, PhotoCaptureScreen, GoalDescriptionScreen, GoalAnalysisScreen } from '@/modules/onboarding';
+import { LanguageSelectionScreen, LoginScreen, PhysicalStatsScreen, PhotoCaptureScreen, GoalDescriptionScreen, GoalAnalysisScreen, StatsRevealScreen } from '@/modules/onboarding';
 import type { UserPhysicalStats } from '@/modules/onboarding';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
@@ -13,7 +13,7 @@ export type OnboardingStackParamList = {
   PhotoCapture: { stats: UserPhysicalStats };
   GoalDescription: { stats: UserPhysicalStats };
   GoalAnalysis: { stats: UserPhysicalStats; goalText: string };
-  StatsReveal: undefined;
+  StatsReveal: { stats: UserPhysicalStats; goalText: string };
   ExecutionPlan: undefined;
 };
 
@@ -43,7 +43,7 @@ export function OnboardingNavigator() {
       <Stack.Screen name="PhotoCapture" component={PhotoCaptureScreen} />
       <Stack.Screen name="GoalDescription" component={GoalDescriptionScreen} />
       <Stack.Screen name="GoalAnalysis" component={GoalAnalysisScreen} />
-      <Stack.Screen name="StatsReveal" component={PlaceholderScreen} />
+      <Stack.Screen name="StatsReveal" component={StatsRevealScreen} />
       <Stack.Screen name="ExecutionPlan" component={PlaceholderScreen} />
     </Stack.Navigator>
   );
