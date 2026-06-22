@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { LanguageSelectionScreen } from '@/modules/onboarding';
+import { LanguageSelectionScreen, LoginScreen } from '@/modules/onboarding';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 
@@ -37,7 +37,7 @@ export function OnboardingNavigator() {
       }}
     >
       <Stack.Screen name="LanguageSelection" component={LanguageSelectionScreen} />
-      <Stack.Screen name="Login" component={PlaceholderScreen} />
+      <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="PhysicalStats" component={PlaceholderScreen} />
       <Stack.Screen name="PhotoCapture" component={PlaceholderScreen} />
       <Stack.Screen name="GoalDescription" component={PlaceholderScreen} />
