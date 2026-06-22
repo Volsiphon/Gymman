@@ -10,13 +10,31 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.gymman.app"
+      "bundleIdentifier": "com.gymman.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used to take your progress photos for body composition analysis.",
+        "NSPhotoLibraryUsageDescription": "Used to select progress photos from your library."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0a0a0a"
       },
-      "package": "com.gymman.app"
-    }
+      "package": "com.gymman.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Used to select your progress photos.",
+          "cameraPermission": "Used to take your progress photos."
+        }
+      ]
+    ]
   }
 }
