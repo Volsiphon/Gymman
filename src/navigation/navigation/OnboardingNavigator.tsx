@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { LanguageSelectionScreen, LoginScreen } from '@/modules/onboarding';
+import { LanguageSelectionScreen, LoginScreen, PhysicalStatsScreen } from '@/modules/onboarding';
+import type { UserPhysicalStats } from '@/modules/onboarding';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 
@@ -9,7 +10,7 @@ export type OnboardingStackParamList = {
   LanguageSelection: undefined;
   Login: undefined;
   PhysicalStats: undefined;
-  PhotoCapture: undefined;
+  PhotoCapture: { stats: UserPhysicalStats };
   GoalDescription: undefined;
   GoalAnalysis: undefined;
   StatsReveal: undefined;
@@ -38,7 +39,7 @@ export function OnboardingNavigator() {
     >
       <Stack.Screen name="LanguageSelection" component={LanguageSelectionScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="PhysicalStats" component={PlaceholderScreen} />
+      <Stack.Screen name="PhysicalStats" component={PhysicalStatsScreen} />
       <Stack.Screen name="PhotoCapture" component={PlaceholderScreen} />
       <Stack.Screen name="GoalDescription" component={PlaceholderScreen} />
       <Stack.Screen name="GoalAnalysis" component={PlaceholderScreen} />
