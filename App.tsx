@@ -1,9 +1,10 @@
+import { registerRootComponent } from 'expo';
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { RootNavigator } from '@/app/navigation';
+import { RootNavigator } from '@/navigation/navigation';
 
-export default function App() {
+function App() {
   return (
     <SafeAreaProvider>
       <NavigationContainer>
@@ -12,3 +13,6 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
+
+export default App;
+registerRootComponent(App);
