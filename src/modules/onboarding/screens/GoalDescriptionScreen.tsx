@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
 import type { OnboardingStackParamList } from '@/navigation/navigation';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
@@ -20,6 +21,7 @@ import { spacing, radius } from '@/theme/spacing';
 
 type Props = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'GoalDescription'>;
+  route: RouteProp<OnboardingStackParamList, 'GoalDescription'>;
 };
 
 const MIN_WORDS = 15;
@@ -31,7 +33,7 @@ const PROMPTS = [
   'What does success feel like?',
 ];
 
-export function GoalDescriptionScreen({ navigation }: Props) {
+export function GoalDescriptionScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
 
@@ -70,7 +72,7 @@ export function GoalDescriptionScreen({ navigation }: Props) {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: spacing.md }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -154,7 +156,7 @@ export function GoalDescriptionScreen({ navigation }: Props) {
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
         <TouchableOpacity
           style={[styles.continueBtn, !isValid && styles.continueBtnDisabled]}
-          onPress={() => navigation.navigate('GoalAnalysis')}
+          onPress={() => navigation.navigate('GoalAnalysis', { stats: route.params.stats, goalText: text })}
           disabled={!isValid}
           activeOpacity={0.85}
         >
@@ -279,10 +281,6 @@ const styles = StyleSheet.create({
 
   // Footer
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     paddingHorizontal: spacing.screenPadding,
     paddingTop: spacing.md,
     backgroundColor: colors.bg.app,

@@ -56,7 +56,7 @@ const SLOT_H = SLOT_W * (4 / 3);
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export function PhotoCaptureScreen({ navigation }: Props) {
+export function PhotoCaptureScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
 
   const [photos, setPhotos] = useState<Record<SlotKey, string | null>>({
@@ -228,7 +228,7 @@ export function PhotoCaptureScreen({ navigation }: Props) {
       <View style={[styles.actions, { paddingBottom: insets.bottom + spacing.md }]}>
         <TouchableOpacity
           style={[styles.continueBtn, !canContinue && styles.continueBtnDisabled]}
-          onPress={() => navigation.navigate('GoalDescription')}
+          onPress={() => navigation.navigate('GoalDescription', { stats: route.params.stats })}
           disabled={!canContinue}
           activeOpacity={0.85}
         >
@@ -239,7 +239,7 @@ export function PhotoCaptureScreen({ navigation }: Props) {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          onPress={() => navigation.navigate('GoalDescription')}
+          onPress={() => navigation.navigate('GoalDescription', { stats: route.params.stats })}
           activeOpacity={0.7}
         >
           <Text style={styles.skipText}>Skip for now</Text>
