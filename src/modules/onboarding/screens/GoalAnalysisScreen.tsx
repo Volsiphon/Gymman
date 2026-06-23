@@ -1,10 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
-  Animated,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
@@ -14,10 +13,13 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { OnboardingStackParamList } from '@/navigation/navigation';
 import { computeBodyStats } from '@/modules/onboarding/utils/fitnessCalculations';
+import type { BodyCompositionStats } from '@/modules/onboarding/utils/fitnessCalculations';
 import {
   analyzeGoal,
   type GoalAnalysisResult,
+  type GoalJourney,
 } from '@/modules/onboarding/services/goalAnalysisService';
+import type { UserPhysicalStats } from '@/modules/onboarding/utils/physicalStatsParser';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -27,447 +29,172 @@ type Props = {
   route: RouteProp<OnboardingStackParamList, 'GoalAnalysis'>;
 };
 
-// ─── Stat card data ───────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-interface StatCard {
-  label: string;
-  value: string;
-  unit: string;
-  color: string;
-  explanation: string;
+function Paragraphs({ text, style }: { text: string; style?: object }) {
+  const parts = text.split('\n\n').filter(Boolean);
+  return (
+    <>
+      {parts.map((p, i) => (
+        <Text key={i} style={[styles.bodyText, style, i > 0 && { marginTop: spacing.sm }]}>
+          {p}
+        </Text>
+      ))}
+    </>
+  );
 }
 
-function buildStatCards(
-  calcs: ReturnType<typeof computeBodyStats>,
-): StatCard[] {
-  return [
+// ─── Section card ─────────────────────────────────────────────────────────────
+
+function SectionCard({
+  icon,
+  iconColor,
+  label,
+  title,
+  children,
+  accent,
+}: {
+  icon: string;
+  iconColor: string;
+  label: string;
+  title: string;
+  children: React.ReactNode;
+  accent?: boolean;
+}) {
+  return (
+    <View style={[styles.card, accent && styles.cardAccent]}>
+      <View style={styles.cardHeader}>
+        <View style={[styles.iconWrap, { backgroundColor: iconColor + '22' }]}>
+          <Ionicons name={icon as any} size={18} color={iconColor} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.cardLabel}>{label}</Text>
+          <Text style={styles.cardTitle}>{title}</Text>
+        </View>
+      </View>
+      <View style={styles.cardDivider} />
+      <View>{children}</View>
+    </View>
+  );
+}
+
+// ─── Journey card ─────────────────────────────────────────────────────────────
+
+function JourneyCard({
+  stats,
+  calcs,
+  journey,
+}: {
+  stats: UserPhysicalStats;
+  calcs: BodyCompositionStats;
+  journey: GoalJourney;
+}) {
+  const targetFatKg =
+    Math.round((journey.targetWeightKg * journey.targetBFPercent) / 100 * 10) / 10;
+  const targetLeanKg =
+    Math.round((journey.targetWeightKg - targetFatKg) * 10) / 10;
+
+  const rows: { label: string; now: string; target: string }[] = [
     {
-      label: 'Body Fat',
-      value: calcs.bfPercent.toString(),
-      unit: '%',
-      color:
-        calcs.bfColor === 'success'
-          ? colors.success
-          : calcs.bfColor === 'gold'
-          ? colors.gold
-          : colors.danger,
-      explanation: `${calcs.bfCategory} range. This is the percentage of your total weight that is fat. Everything else — muscle, bone, organs, water — is lean mass.`,
+      label: 'Body Weight',
+      now: `${stats.weightKg} kg`,
+      target: `${journey.targetWeightKg} kg`,
     },
     {
-      label: 'Lean Body Mass',
-      value: calcs.lbmKg.toString(),
-      unit: 'kg',
-      color: colors.info,
-      explanation: `Your ${calcs.lbmKg} kg of lean mass is your actual body — muscle, bones, organs. This is the part worth protecting. When you lose weight, the goal is to lose fat, not this.`,
+      label: 'Body Fat',
+      now: `${calcs.bfPercent}%`,
+      target: `${journey.targetBFPercent}%`,
     },
     {
       label: 'Fat Mass',
-      value: calcs.fatMassKg.toString(),
-      unit: 'kg',
-      color:
-        calcs.bfColor === 'danger' ? colors.danger : colors.text.secondary,
-      explanation: `${calcs.fatMassKg} kg of stored fat. Your body needs some fat to function — roughly 5% for men and 12% for women as an absolute minimum. The rest is optional.`,
+      now: `${calcs.fatMassKg} kg`,
+      target: `${targetFatKg} kg`,
     },
     {
-      label: 'Maintenance',
-      value: calcs.tdee.toString(),
-      unit: 'kcal',
-      color: colors.primaryLight,
-      explanation: `You burn roughly ${calcs.tdee} calories a day just existing and moving around. Eat less than this to lose fat. Eat more to gain muscle. This number changes as your body changes.`,
-    },
-    {
-      label: 'Current Build',
-      value: calcs.buildDescription,
-      unit: '',
-      color: colors.text.primary,
-      explanation: `Estimated from your body fat (${calcs.bfPercent}%) and lean mass index (${calcs.ffmi}). ${calcs.estimationMethod === 'navy' ? 'Calculated using the US Navy body measurement formula.' : 'Estimated from your BMI since full measurements were not provided.'}`,
+      label: 'Lean Mass',
+      now: `${calcs.lbmKg} kg`,
+      target: `${targetLeanKg} kg`,
     },
   ];
-}
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
-
-type Page = 'stats' | 'analysis';
-
-export function GoalAnalysisScreen({ navigation, route }: Props) {
-  const { stats, goalText, startOnAnalysis } = route.params;
-  const insets = useSafeAreaInsets();
-  const calcs = computeBodyStats(stats);
-  const statCards = buildStatCards(calcs);
-
-  const [page, setPage] = useState<Page>(startOnAnalysis ? 'analysis' : 'stats');
-  const [analysis, setAnalysis] = useState<GoalAnalysisResult | null>(null);
-  const [analysisError, setAnalysisError] = useState(false);
-  const [chosenAlternative, setChosenAlternative] = useState(false);
-
-  // Expanded explanation card
-  const [expandedCard, setExpandedCard] = useState<number | null>(null);
-
-  // Page-level fade animation
-  const statsOpacity = useRef(new Animated.Value(startOnAnalysis ? 0 : 1)).current;
-  const analysisOpacity = useRef(new Animated.Value(startOnAnalysis ? 1 : 0)).current;
-
-  // Stat card entrance animation — staggered
-  const cardAnims = useRef(statCards.map(() => new Animated.Value(0))).current;
-
-  useEffect(() => {
-    // Staggered card entrance
-    const anims = cardAnims.map((anim, i) =>
-      Animated.timing(anim, {
-        toValue: 1,
-        duration: 300,
-        delay: 120 + i * 80,
-        useNativeDriver: true,
-      }),
-    );
-    Animated.parallel(anims).start();
-
-    // Fire AI analysis in background with 1.5s minimum wait
-    const start = Date.now();
-    analyzeGoal(stats, goalText, calcs)
-      .then(result => {
-        const elapsed = Date.now() - start;
-        const remaining = Math.max(0, 1500 - elapsed);
-        setTimeout(() => setAnalysis(result), remaining);
-      })
-      .catch(() => {
-        const elapsed = Date.now() - start;
-        const remaining = Math.max(0, 1500 - elapsed);
-        setTimeout(() => setAnalysisError(true), remaining);
-      });
-  }, []);
-
-  function goToAnalysis() {
-    Animated.parallel([
-      Animated.timing(statsOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
-      Animated.timing(analysisOpacity, { toValue: 1, duration: 300, delay: 160, useNativeDriver: true }),
-    ]).start(() => setPage('analysis'));
-  }
-
-  // ─── Render stat cards (page 1) ─────────────────────────────────────────────
-
-  function renderStatCards() {
-    return (
-      <Animated.View
-      style={[StyleSheet.absoluteFill, { opacity: statsOpacity }]}
-      pointerEvents={page === 'stats' ? 'auto' : 'none'}
-    >
-        <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.heroBlock}>
-            <Text style={styles.heroTitle}>Here's where you're starting from.</Text>
-            <Text style={styles.heroSub}>
-              We ran your measurements through some formulas. Tap any card to understand what it means.
-            </Text>
-          </View>
-
-          <View style={styles.cardList}>
-            {statCards.map((card, i) => {
-              const isExpanded = expandedCard === i;
-              return (
-                <Animated.View
-                  key={i}
-                  style={{
-                    opacity: cardAnims[i],
-                    transform: [
-                      {
-                        translateY: cardAnims[i].interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [20, 0],
-                        }),
-                      },
-                    ],
-                  }}
-                >
-                  <TouchableOpacity
-                    style={[styles.statCard, isExpanded && styles.statCardExpanded]}
-                    onPress={() => setExpandedCard(isExpanded ? null : i)}
-                    activeOpacity={0.85}
-                  >
-                    <View style={styles.statCardRow}>
-                      <View style={styles.statCardLeft}>
-                        <Text style={styles.statLabel}>{card.label}</Text>
-                        <View style={styles.statValueRow}>
-                          <Text style={[styles.statValue, { color: card.color }]}>
-                            {card.value}
-                          </Text>
-                          {card.unit !== '' && (
-                            <Text style={[styles.statUnit, { color: card.color }]}>
-                              {card.unit}
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-                      <Ionicons
-                        name={isExpanded ? 'chevron-up' : 'information-circle-outline'}
-                        size={20}
-                        color={colors.text.muted}
-                      />
-                    </View>
-
-                    {isExpanded && (
-                      <Text style={styles.explanation}>{card.explanation}</Text>
-                    )}
-                  </TouchableOpacity>
-                </Animated.View>
-              );
-            })}
-          </View>
-        </ScrollView>
-
-        <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-          <TouchableOpacity
-            style={styles.continueBtn}
-            onPress={goToAnalysis}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.continueBtnText}>See your goal analysis</Text>
-            <Ionicons name="arrow-forward" size={18} color={colors.text.inverse} style={{ marginLeft: 6 }} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.ghostBtn}
-            onPress={() => navigation.navigate('StatsReveal', { stats, goalText })}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="body-outline" size={16} color={colors.text.secondary} style={{ marginRight: 6 }} />
-            <Text style={styles.ghostBtnText}>Understand my body's metrics first</Text>
-          </TouchableOpacity>
-        </View>
-      </Animated.View>
-    );
-  }
-
-  // ─── Render analysis (page 2) ────────────────────────────────────────────────
-
-  function renderAnalysis() {
-    if (analysisError) {
-      return (
-        <Animated.View
-        style={[StyleSheet.absoluteFill, styles.centeredFlex, { opacity: analysisOpacity }]}
-        pointerEvents={page === 'analysis' ? 'auto' : 'none'}
-      >
-          <Ionicons name="wifi-outline" size={40} color={colors.text.muted} />
-          <Text style={[styles.heroTitle, { marginTop: spacing.md, textAlign: 'center' }]}>
-            Couldn't reach the coach
-          </Text>
-          <Text style={[styles.heroSub, { textAlign: 'center', marginTop: spacing.sm }]}>
-            Check your connection and try again.
-          </Text>
-          <TouchableOpacity
-            style={[styles.continueBtn, { marginTop: spacing.xl }]}
-            onPress={() => navigation.navigate('ExecutionPlan', { stats, goalText })}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.continueBtnText}>Continue anyway</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      );
-    }
-
-    if (!analysis) {
-      return (
-        <Animated.View
-        style={[StyleSheet.absoluteFill, styles.centeredFlex, { opacity: analysisOpacity }]}
-        pointerEvents={page === 'analysis' ? 'auto' : 'none'}
-      >
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { marginTop: spacing.lg }]}>
-            Analysing your goal...
-          </Text>
-          <Text style={styles.loadingSubText}>
-            Reading your numbers. One moment.
-          </Text>
-        </Animated.View>
-      );
-    }
-
-    const { isRealistic, interpretedGoal, coachNote, realisticPath, alternativeGoal, foundationPath } = analysis;
-
-    return (
-      <Animated.View
-      style={[StyleSheet.absoluteFill, { opacity: analysisOpacity }]}
-      pointerEvents={page === 'analysis' ? 'auto' : 'none'}
-    >
-        <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Interpreted goal */}
-          <View style={styles.heroBlock}>
-            <Text style={styles.heroTitle}>What you're really after</Text>
-            <View style={styles.interpretedCard}>
-              <Text style={styles.interpretedText}>"{interpretedGoal}"</Text>
-            </View>
-          </View>
-
-          {/* Coach verdict badge */}
-          <View style={[styles.verdictBadge, isRealistic ? styles.verdictGreen : styles.verdictAmber]}>
-            <Ionicons
-              name={isRealistic ? 'checkmark-circle' : 'alert-circle'}
-              size={18}
-              color={isRealistic ? colors.success : colors.gold}
-            />
-            <Text style={[styles.verdictText, { color: isRealistic ? colors.success : colors.gold }]}>
-              {isRealistic ? 'This goal is achievable' : 'This goal needs a rethink'}
-            </Text>
-          </View>
-
-          {/* Coach note */}
-          <View style={styles.coachCard}>
-            <Text style={styles.coachLabel}>From your coach</Text>
-            <Text style={styles.coachNote}>{coachNote}</Text>
-          </View>
-
-          {/* Realistic path */}
-          {isRealistic && realisticPath && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Your journey</Text>
-              <View style={styles.journeyCard}>
-                <View style={styles.journeyRow}>
-                  <View style={styles.journeyPoint}>
-                    <Text style={styles.journeyPointLabel}>Now</Text>
-                    <Text style={styles.journeyValue}>{stats.weightKg} kg</Text>
-                    <Text style={styles.journeyValueSub}>{calcs.bfPercent}% BF</Text>
-                  </View>
-                  <View style={styles.journeyArrow}>
-                    <View style={styles.journeyLine} />
-                    <Ionicons name="arrow-forward" size={14} color={colors.text.muted} />
-                    <Text style={styles.journeyTimeline}>{realisticPath.timelineRange}</Text>
-                  </View>
-                  <View style={styles.journeyPoint}>
-                    <Text style={styles.journeyPointLabel}>Target</Text>
-                    <Text style={[styles.journeyValue, { color: colors.success }]}>
-                      {realisticPath.targetWeightKg} kg
-                    </Text>
-                    <Text style={[styles.journeyValueSub, { color: colors.success }]}>
-                      {realisticPath.targetBFPercent}% BF
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.divider} />
-
-                <Text style={styles.journeyDescLabel}>What it looks like</Text>
-                <Text style={styles.journeyDesc}>{realisticPath.whatItLooksLike}</Text>
-
-                <View style={[styles.earlyWinsRow]}>
-                  <Ionicons name="flash" size={14} color={colors.gold} />
-                  <Text style={styles.earlyWinsText}>{realisticPath.earlyWins}</Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* Unrealistic path — two choices */}
-          {!isRealistic && !chosenAlternative && alternativeGoal && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>What do you want to do?</Text>
-
-              <TouchableOpacity
-                style={styles.choiceCard}
-                onPress={() => navigation.navigate('ExecutionPlan', { stats, goalText })}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="flame-outline" size={20} color={colors.primaryLight} />
-                <View style={styles.choiceText}>
-                  <Text style={styles.choiceTitle}>I don't care. I must achieve this.</Text>
-                  <Text style={styles.choiceSub}>
-                    We'll build a plan around your original goal. It's harder — but you decide.
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.text.muted} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.choiceCard, { marginTop: spacing.sm }]}
-                onPress={() => setChosenAlternative(true)}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="bulb-outline" size={20} color={colors.gold} />
-                <View style={styles.choiceText}>
-                  <Text style={styles.choiceTitle}>Show me a better goal suited to me</Text>
-                  <Text style={styles.choiceSub}>
-                    See an alternative goal your coach recommends based on your actual numbers.
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.text.muted} />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Alternative goal card */}
-          {!isRealistic && chosenAlternative && alternativeGoal && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>A better fit for you</Text>
-              <View style={styles.altGoalCard}>
-                <Text style={styles.altGoalTitle}>{alternativeGoal.title}</Text>
-                <Text style={styles.altGoalDesc}>{alternativeGoal.description}</Text>
-                <View style={styles.altGoalStats}>
-                  <View style={styles.altGoalStat}>
-                    <Text style={styles.altGoalStatValue}>{alternativeGoal.targetWeightKg} kg</Text>
-                    <Text style={styles.altGoalStatLabel}>Target weight</Text>
-                  </View>
-                  <View style={styles.altGoalStat}>
-                    <Text style={styles.altGoalStatValue}>{alternativeGoal.targetBFPercent}%</Text>
-                    <Text style={styles.altGoalStatLabel}>Body fat</Text>
-                  </View>
-                  <View style={styles.altGoalStat}>
-                    <Text style={styles.altGoalStatValue}>{alternativeGoal.timelineMonths}mo</Text>
-                    <Text style={styles.altGoalStatLabel}>Timeline</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* Foundation path — always shown */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Start here first</Text>
-            <View style={styles.foundationCard}>
-              <Text style={styles.foundationDesc}>{foundationPath.description}</Text>
-              <View style={styles.foundationStats}>
-                <View style={styles.altGoalStat}>
-                  <Text style={styles.altGoalStatValue}>{foundationPath.targetWeightKg} kg</Text>
-                  <Text style={styles.altGoalStatLabel}>First target</Text>
-                </View>
-                <View style={styles.altGoalStat}>
-                  <Text style={styles.altGoalStatValue}>{foundationPath.targetBFPercent}%</Text>
-                  <Text style={styles.altGoalStatLabel}>Body fat</Text>
-                </View>
-                <View style={styles.altGoalStat}>
-                  <Text style={styles.altGoalStatValue}>{foundationPath.timelineMonths}mo</Text>
-                  <Text style={styles.altGoalStatLabel}>Timeline</Text>
-                </View>
-              </View>
-              <View style={styles.foundationNote}>
-                <Ionicons name="lock-open-outline" size={14} color={colors.info} />
-                <Text style={styles.foundationNoteText}>{foundationPath.note}</Text>
-              </View>
-            </View>
-          </View>
-        </ScrollView>
-
-        <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-          <TouchableOpacity
-            style={styles.continueBtn}
-            onPress={() => navigation.navigate('ExecutionPlan', { stats, goalText })}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.continueBtnText}>Build my execution plan</Text>
-            <Ionicons name="arrow-forward" size={18} color={colors.text.inverse} style={{ marginLeft: 6 }} />
-          </TouchableOpacity>
-        </View>
-      </Animated.View>
-    );
-  }
-
-  // ─── Root ────────────────────────────────────────────────────────────────────
 
   return (
-    <View style={[styles.root]}>
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <View style={[styles.iconWrap, { backgroundColor: colors.success + '22' }]}>
+          <Ionicons name="trending-up-outline" size={18} color={colors.success} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.cardLabel}>YOUR JOURNEY</Text>
+          <Text style={styles.cardTitle}>Now and Target</Text>
+        </View>
+      </View>
+      <View style={styles.cardDivider} />
+
+      {/* Column headers */}
+      <View style={styles.journeyRow}>
+        <Text style={[styles.journeyCell, { flex: 2 }]} />
+        <Text style={[styles.journeyColHead, { flex: 2, textAlign: 'right' }]}>NOW</Text>
+        <View style={{ width: 28 }} />
+        <Text style={[styles.journeyColHead, { flex: 2, textAlign: 'left', color: colors.success }]}>
+          TARGET
+        </Text>
+      </View>
+
+      {rows.map((row, i) => (
+        <View key={i} style={[styles.journeyRow, i > 0 && styles.journeyRowBorder]}>
+          <Text style={[styles.journeyRowLabel, { flex: 2 }]}>{row.label}</Text>
+          <Text style={[styles.journeyNow, { flex: 2, textAlign: 'right' }]}>{row.now}</Text>
+          <View style={{ width: 28, alignItems: 'center' }}>
+            <Ionicons name="arrow-forward" size={12} color={colors.text.muted} />
+          </View>
+          <Text style={[styles.journeyTarget, { flex: 2, textAlign: 'left' }]}>{row.target}</Text>
+        </View>
+      ))}
+
+      <View style={[styles.cardDivider, { marginTop: spacing.md }]} />
+
+      <View style={styles.journeyMeta}>
+        <Ionicons name="time-outline" size={14} color={colors.gold} />
+        <Text style={styles.journeyMetaText}>
+          Timeline:{' '}
+          <Text style={{ color: colors.gold, fontWeight: '600' }}>{journey.timelineText}</Text>
+        </Text>
+      </View>
+      <View style={[styles.journeyMeta, { marginTop: spacing.xs }]}>
+        <Ionicons name="flash-outline" size={14} color={colors.info} />
+        <Text style={styles.journeyMetaText}>{journey.earlyWins}</Text>
+      </View>
+    </View>
+  );
+}
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
+
+export function GoalAnalysisScreen({ navigation, route }: Props) {
+  const { stats, goalText } = route.params;
+  const insets = useSafeAreaInsets();
+  const calcs = computeBodyStats(stats);
+
+  const [result, setResult] = useState<GoalAnalysisResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    analyzeGoal(stats, goalText, calcs)
+      .then(setResult)
+      .catch(() => setError('Something went wrong analysing your goal. Please try again.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const journey: GoalJourney | undefined =
+    result?.journey ??
+    result?.alternativeGoal?.journey ??
+    undefined;
+
+  const isRehab = result?.goalType === 'rehabilitation';
+
+  return (
+    <View style={styles.root}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.xs }]}>
         <TouchableOpacity
@@ -476,16 +203,208 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
         >
           <Ionicons name="chevron-back" size={24} color={colors.text.secondary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {page === 'stats' ? 'Your Numbers' : 'Goal Analysis'}
-        </Text>
+        <Text style={styles.headerTitle}>Goal Analysis</Text>
         <View style={{ width: 24 }} />
       </View>
 
-      <View style={{ flex: 1 }}>
-        {renderStatCards()}
-        {renderAnalysis()}
-      </View>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingBottom: insets.bottom + 140 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Loading */}
+        {loading && (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Analysing your goal…</Text>
+            <Text style={styles.loadingSubText}>
+              We're breaking down what your goal actually means and what it'll take to get there.
+            </Text>
+          </View>
+        )}
+
+        {/* Error */}
+        {error && !loading && (
+          <View style={styles.errorBox}>
+            <Ionicons name="alert-circle-outline" size={40} color={colors.danger} />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity
+              style={styles.retryBtn}
+              onPress={() => {
+                setError(null);
+                setLoading(true);
+                analyzeGoal(stats, goalText, calcs)
+                  .then(setResult)
+                  .catch(() => setError('Something went wrong analysing your goal. Please try again.'))
+                  .finally(() => setLoading(false));
+              }}
+            >
+              <Text style={styles.retryBtnText}>Try again</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Content */}
+        {result && !loading && (
+          <View style={styles.content}>
+
+            {/* ── Disclaimer ──────────────────────────────────────────────── */}
+            <View style={styles.disclaimer}>
+              <Ionicons name="information-circle-outline" size={16} color={colors.text.muted} />
+              <Text style={styles.disclaimerText}>
+                Don't be put off if you don't recognise terms like calories or body fat — Gymman
+                will walk you through everything before it actually matters for you.
+              </Text>
+            </View>
+
+            {/* ── Section 1: Simple summary ────────────────────────────────── */}
+            {result.goalSimplified && (
+              <SectionCard
+                icon="flag-outline"
+                iconColor={colors.primaryLight}
+                label="YOUR GOAL, SIMPLIFIED"
+                title="What you're actually after"
+              >
+                <Paragraphs text={result.goalSimplified} />
+              </SectionCard>
+            )}
+
+            {/* ── Section 2: What the goal really means ────────────────────── */}
+            <SectionCard
+              icon="telescope-outline"
+              iconColor={colors.info}
+              label="WHAT IT ACTUALLY MEANS"
+              title={
+                isRehab
+                  ? 'Understanding your goal'
+                  : 'Breaking it down'
+              }
+            >
+              <Paragraphs text={result.goalInterpretation} />
+            </SectionCard>
+
+            {/* ── Rehab guidance ───────────────────────────────────────────── */}
+            {isRehab && result.rehabilitationGuidance && (
+              <SectionCard
+                icon="medkit-outline"
+                iconColor={colors.gold}
+                label="WHAT WE RECOMMEND"
+                title="Your next step"
+              >
+                <Paragraphs text={result.rehabilitationGuidance} />
+              </SectionCard>
+            )}
+
+            {/* ── Section 3: Feasible — your path ─────────────────────────── */}
+            {!isRehab && result.isFeasible && result.personalizedBreakdown && (
+              <SectionCard
+                icon="calculator-outline"
+                iconColor={colors.success}
+                label="YOUR PATH TO GET THERE"
+                title="What it looks like for you"
+              >
+                {result.feasibilityNote && (
+                  <Text style={[styles.feasibilityNote, { marginBottom: spacing.sm }]}>
+                    {result.feasibilityNote}
+                  </Text>
+                )}
+                <Paragraphs text={result.personalizedBreakdown} />
+              </SectionCard>
+            )}
+
+            {/* ── Section 3: Not feasible — alternative + foundation ──────── */}
+            {!isRehab && result.isFeasible === false && (
+              <>
+                {result.feasibilityNote && (
+                  <View style={styles.infeasibleNote}>
+                    <Ionicons name="alert-circle-outline" size={16} color={colors.gold} />
+                    <Text style={styles.infeasibleNoteText}>{result.feasibilityNote}</Text>
+                  </View>
+                )}
+
+                {result.alternativeGoal && (
+                  <SectionCard
+                    icon="rocket-outline"
+                    iconColor={colors.primaryLight}
+                    label="WE RECOMMEND THIS INSTEAD"
+                    title={result.alternativeGoal.title}
+                    accent
+                  >
+                    <Text style={styles.salesPitch}>{result.alternativeGoal.salesPitch}</Text>
+                    <View style={styles.cardDivider} />
+                    <Paragraphs text={result.alternativeGoal.goalSimplified} />
+                    <View style={styles.cardDivider} />
+                    <Paragraphs text={result.alternativeGoal.personalizedBreakdown} />
+                  </SectionCard>
+                )}
+
+                {result.foundationGoal && (
+                  <SectionCard
+                    icon="layers-outline"
+                    iconColor={colors.info}
+                    label="YOUR FOUNDATION GOAL"
+                    title={result.foundationGoal.title}
+                  >
+                    <Text style={styles.rationaleText}>{result.foundationGoal.rationale}</Text>
+                    <View style={styles.cardDivider} />
+                    <Paragraphs text={result.foundationGoal.goalSimplified} />
+                    <View style={styles.cardDivider} />
+                    <Paragraphs text={result.foundationGoal.personalizedBreakdown} />
+                  </SectionCard>
+                )}
+              </>
+            )}
+
+            {/* ── Education ────────────────────────────────────────────────── */}
+            <View style={styles.educationBlock}>
+              <Text style={styles.educationTitle}>{result.educationTitle}</Text>
+              <Paragraphs text={result.educationContent} style={styles.educationBody} />
+            </View>
+
+            {/* ── Journey: Now and Target ───────────────────────────────────── */}
+            {journey && !isRehab && (
+              <JourneyCard stats={stats} calcs={calcs} journey={journey} />
+            )}
+
+            {/* ── Transition text ──────────────────────────────────────────── */}
+            <Text style={styles.transitionText}>
+              It's completely okay if you still don't fully grasp your goal — that's exactly
+              what we're here for. Let's keep going and make it even clearer.
+            </Text>
+
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Footer CTA */}
+      {result && !loading && (
+        <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
+          {!isRehab && (
+            <Text style={styles.footerHint}>
+              Now that you know what your goal actually means, let's see how you can
+              execute it. First, let's check your numbers — the scary stuff like calories
+              and such. Don't worry, we'll teach you.
+            </Text>
+          )}
+          <TouchableOpacity
+            style={styles.ctaBtn}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('ExecutionPlan', { stats, goalText })}
+          >
+            <Text style={styles.ctaBtnText}>
+              {isRehab ? 'Back to onboarding' : 'Check my numbers'}
+            </Text>
+            <Ionicons
+              name="arrow-forward"
+              size={18}
+              color={colors.text.inverse}
+              style={{ marginLeft: 6 }}
+            />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -512,119 +431,17 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
 
-  scrollContent: {
+  scroll: {
     paddingHorizontal: spacing.screenPadding,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.lg,
   },
 
-  heroBlock: {
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  heroTitle: {
-    ...typography.title2,
-    color: colors.text.primary,
-  },
-  heroSub: {
-    ...typography.callout,
-    color: colors.text.secondary,
-    lineHeight: 22,
-  },
-
-  // ─── Stat cards ───────────────────────────────────────────────────────────
-  cardList: {
-    gap: spacing.sm,
-  },
-  statCard: {
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    padding: spacing.md,
-  },
-  statCardExpanded: {
-    borderColor: colors.border.strong,
-  },
-  statCardRow: {
-    flexDirection: 'row',
+  // ── Loading / error ──────────────────────────────────────────────────────────
+  loadingBox: {
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  statCardLeft: {
-    gap: 4,
-    flex: 1,
-  },
-  statLabel: {
-    ...typography.footnote,
-    color: colors.text.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  statValueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-  },
-  statValue: {
-    ...typography.title2,
-    fontWeight: '700',
-  },
-  statUnit: {
-    ...typography.callout,
-    fontWeight: '500',
-  },
-  explanation: {
-    ...typography.footnote,
-    color: colors.text.secondary,
-    lineHeight: 20,
-    marginTop: spacing.md,
-  },
-
-  // ─── Footer ───────────────────────────────────────────────────────────────
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: spacing.screenPadding,
-    paddingTop: spacing.md,
-    backgroundColor: colors.bg.app,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border.subtle,
-  },
-  continueBtn: {
-    height: spacing.buttonHeight,
-    backgroundColor: colors.primary,
-    borderRadius: radius.button,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  continueBtnText: {
-    ...typography.bodyMedium,
-    color: colors.text.inverse,
-  },
-  ghostBtn: {
-    height: spacing.buttonHeight,
-    borderRadius: radius.button,
-    borderWidth: 1,
-    borderColor: colors.border.strong,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.sm,
-    flexDirection: 'row',
-  },
-  ghostBtnText: {
-    ...typography.bodyMedium,
-    color: colors.text.secondary,
-  },
-
-  // ─── Loading / error ──────────────────────────────────────────────────────
-  centeredFlex: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.screenPadding,
+    gap: spacing.md,
+    paddingTop: spacing['2xl'],
+    paddingHorizontal: spacing.xl,
   },
   loadingText: {
     ...typography.title3,
@@ -635,256 +452,249 @@ const styles = StyleSheet.create({
     ...typography.callout,
     color: colors.text.muted,
     textAlign: 'center',
-    marginTop: spacing.xs,
-  },
-
-  // ─── Analysis ─────────────────────────────────────────────────────────────
-  interpretedCard: {
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    padding: spacing.md,
-  },
-  interpretedText: {
-    ...typography.callout,
-    color: colors.text.primary,
-    fontStyle: 'italic',
-    lineHeight: 24,
-  },
-
-  verdictBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.full,
-    alignSelf: 'flex-start',
-    marginBottom: spacing.lg,
-  },
-  verdictGreen: {
-    backgroundColor: colors.successMuted,
-    borderWidth: 1,
-    borderColor: 'rgba(34, 197, 94, 0.3)',
-  },
-  verdictAmber: {
-    backgroundColor: colors.goldMuted,
-    borderWidth: 1,
-    borderColor: 'rgba(234, 179, 8, 0.3)',
-  },
-  verdictText: {
-    ...typography.footnote,
-    fontWeight: '600',
-  },
-
-  coachCard: {
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-    gap: spacing.sm,
-  },
-  coachLabel: {
-    ...typography.caption,
-    color: colors.text.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  coachNote: {
-    ...typography.callout,
-    color: colors.text.primary,
-    lineHeight: 24,
-  },
-
-  section: {
-    marginBottom: spacing.lg,
-    gap: spacing.sm,
-  },
-  sectionTitle: {
-    ...typography.subhead,
-    color: colors.text.secondary,
-    fontWeight: '600',
-  },
-
-  // ─── Journey card ─────────────────────────────────────────────────────────
-  journeyCard: {
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    padding: spacing.md,
-    gap: spacing.md,
-  },
-  journeyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  journeyPoint: {
-    alignItems: 'center',
-    gap: 2,
-    minWidth: 64,
-  },
-  journeyPointLabel: {
-    ...typography.caption,
-    color: colors.text.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  journeyValue: {
-    ...typography.title3,
-    color: colors.text.primary,
-    fontWeight: '700',
-  },
-  journeyValueSub: {
-    ...typography.footnote,
-    color: colors.text.muted,
-  },
-  journeyArrow: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 2,
-  },
-  journeyLine: {
-    height: 1,
-    backgroundColor: colors.border.default,
-    width: '60%',
-    marginBottom: 2,
-  },
-  journeyTimeline: {
-    ...typography.caption,
-    color: colors.text.disabled,
-    textAlign: 'center',
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border.subtle,
-  },
-  journeyDescLabel: {
-    ...typography.caption,
-    color: colors.text.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  journeyDesc: {
-    ...typography.callout,
-    color: colors.text.secondary,
     lineHeight: 22,
   },
-  earlyWinsRow: {
+
+  errorBox: {
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingTop: spacing['2xl'],
+    paddingHorizontal: spacing.xl,
+  },
+  errorText: {
+    ...typography.callout,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  retryBtn: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.button,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  retryBtnText: {
+    ...typography.subhead,
+    color: colors.text.primary,
+  },
+
+  // ── Content wrapper ──────────────────────────────────────────────────────────
+  content: {
+    gap: spacing.md,
+  },
+
+  // ── Disclaimer ───────────────────────────────────────────────────────────────
+  disclaimer: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'flex-start',
+    backgroundColor: colors.bg.card,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    padding: spacing.md,
+  },
+  disclaimerText: {
+    ...typography.footnote,
+    color: colors.text.muted,
+    flex: 1,
+    lineHeight: 19,
+    fontStyle: 'italic',
+  },
+
+  // ── Card ─────────────────────────────────────────────────────────────────────
+  card: {
+    backgroundColor: colors.bg.card,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    padding: spacing.md,
+  },
+  cardAccent: {
+    borderColor: colors.primaryBorder,
+    backgroundColor: colors.bg.elevated,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  iconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginTop: 2,
+  },
+  cardLabel: {
+    ...typography.label,
+    color: colors.text.muted,
+    marginBottom: 2,
+  },
+  cardTitle: {
+    ...typography.subhead,
+    color: colors.text.primary,
+    fontWeight: '600',
+    lineHeight: 21,
+  },
+  cardDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border.subtle,
+    marginVertical: spacing.sm,
+  },
+
+  // ── Body text ─────────────────────────────────────────────────────────────────
+  bodyText: {
+    ...typography.callout,
+    color: colors.text.secondary,
+    lineHeight: 23,
+  },
+
+  // ── Feasibility + infeasible notes ───────────────────────────────────────────
+  feasibilityNote: {
+    ...typography.footnote,
+    color: colors.success,
+    lineHeight: 19,
+    fontStyle: 'italic',
+  },
+  infeasibleNote: {
     flexDirection: 'row',
     gap: spacing.sm,
     alignItems: 'flex-start',
     backgroundColor: colors.goldMuted,
     borderRadius: radius.md,
-    padding: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.gold + '40',
+    padding: spacing.md,
   },
-  earlyWinsText: {
+  infeasibleNoteText: {
     ...typography.footnote,
-    color: colors.text.secondary,
-    lineHeight: 18,
+    color: colors.gold,
     flex: 1,
+    lineHeight: 19,
   },
 
-  // ─── Choice cards ─────────────────────────────────────────────────────────
-  choiceCard: {
+  // ── Sales pitch / rationale (infeasible path) ─────────────────────────────────
+  salesPitch: {
+    ...typography.callout,
+    color: colors.primaryLight,
+    lineHeight: 23,
+    fontWeight: '500',
+    marginBottom: spacing.xs,
+  },
+  rationaleText: {
+    ...typography.callout,
+    color: colors.info,
+    lineHeight: 23,
+    fontStyle: 'italic',
+    marginBottom: spacing.xs,
+  },
+
+  // ── Education block ───────────────────────────────────────────────────────────
+  educationBlock: {
+    backgroundColor: colors.bg.elevated,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  educationTitle: {
+    ...typography.label,
+    color: colors.text.muted,
+    marginBottom: spacing.xs,
+  },
+  educationBody: {
+    color: colors.text.secondary,
+  },
+
+  // ── Journey card ──────────────────────────────────────────────────────────────
+  journeyRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    padding: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  choiceText: {
-    flex: 1,
-    gap: 4,
-  },
-  choiceTitle: {
-    ...typography.callout,
-    color: colors.text.primary,
-    fontWeight: '600',
-  },
-  choiceSub: {
-    ...typography.footnote,
-    color: colors.text.muted,
-    lineHeight: 18,
-  },
-
-  // ─── Alt goal card ────────────────────────────────────────────────────────
-  altGoalCard: {
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    padding: spacing.md,
-    gap: spacing.md,
-  },
-  altGoalTitle: {
-    ...typography.title3,
-    color: colors.text.primary,
-    fontWeight: '700',
-  },
-  altGoalDesc: {
-    ...typography.callout,
-    color: colors.text.secondary,
-    lineHeight: 22,
-  },
-  altGoalStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingTop: spacing.sm,
+  journeyRowBorder: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border.subtle,
   },
-  altGoalStat: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  altGoalStatValue: {
-    ...typography.title3,
-    color: colors.text.primary,
-    fontWeight: '700',
-  },
-  altGoalStatLabel: {
-    ...typography.caption,
+  journeyColHead: {
+    ...typography.label,
     color: colors.text.muted,
   },
-
-  // ─── Foundation card ──────────────────────────────────────────────────────
-  foundationCard: {
-    backgroundColor: colors.infoMuted,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: 'rgba(6, 182, 212, 0.25)',
-    padding: spacing.md,
-    gap: spacing.md,
+  journeyCell: {
+    flex: 2,
   },
-  foundationStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(6, 182, 212, 0.2)',
-  },
-  foundationDesc: {
-    ...typography.callout,
-    color: colors.text.primary,
-    lineHeight: 22,
-  },
-  foundationNote: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'flex-start',
-  },
-  foundationNoteText: {
+  journeyRowLabel: {
     ...typography.footnote,
-    color: colors.info,
+    color: colors.text.muted,
+  },
+  journeyNow: {
+    ...typography.subhead,
+    color: colors.text.secondary,
+  },
+  journeyTarget: {
+    ...typography.subhead,
+    color: colors.success,
+    fontWeight: '600',
+  },
+  journeyMeta: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  journeyMetaText: {
+    ...typography.footnote,
+    color: colors.text.muted,
     flex: 1,
+    lineHeight: 19,
+  },
+
+  // ── Transition text ───────────────────────────────────────────────────────────
+  transitionText: {
+    ...typography.callout,
+    color: colors.text.muted,
+    lineHeight: 23,
+    textAlign: 'center',
+    paddingHorizontal: spacing.sm,
+    fontStyle: 'italic',
+  },
+
+  // ── Footer ───────────────────────────────────────────────────────────────────
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: spacing.screenPadding,
+    paddingTop: spacing.md,
+    backgroundColor: colors.bg.app,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border.subtle,
+    gap: spacing.sm,
+  },
+  footerHint: {
+    ...typography.footnote,
+    color: colors.text.muted,
     lineHeight: 18,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  ctaBtn: {
+    height: spacing.buttonHeight,
+    backgroundColor: colors.primary,
+    borderRadius: radius.button,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  ctaBtnText: {
+    ...typography.bodyMedium,
+    color: colors.text.inverse,
   },
 });
