@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { LanguageSelectionScreen, LoginScreen, PhysicalStatsScreen, PhotoCaptureScreen, GoalDescriptionScreen, GoalAnalysisScreen, StatsRevealScreen } from '@/modules/onboarding';
+import { LanguageSelectionScreen, LoginScreen, PhysicalStatsScreen, PhotoCaptureScreen, GoalDescriptionScreen, GoalAnalysisScreen, StatsRevealScreen, ExecutionPlanScreen } from '@/modules/onboarding';
 import type { UserPhysicalStats } from '@/modules/onboarding';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
@@ -12,21 +12,13 @@ export type OnboardingStackParamList = {
   PhysicalStats: undefined;
   PhotoCapture: { stats: UserPhysicalStats };
   GoalDescription: { stats: UserPhysicalStats };
-  GoalAnalysis: { stats: UserPhysicalStats; goalText: string };
+  GoalAnalysis: { stats: UserPhysicalStats; goalText: string; startOnAnalysis?: boolean };
   StatsReveal: { stats: UserPhysicalStats; goalText: string };
-  ExecutionPlan: undefined;
+  ExecutionPlan: { stats: UserPhysicalStats; goalText: string };
 };
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();
 
-// Placeholder shown for screens not yet built — replaced as each is completed
-function PlaceholderScreen({ route }: any) {
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.bg.app, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ ...typography.body, color: colors.text.muted }}>{route.name}</Text>
-    </View>
-  );
-}
 
 export function OnboardingNavigator() {
   return (
@@ -44,7 +36,7 @@ export function OnboardingNavigator() {
       <Stack.Screen name="GoalDescription" component={GoalDescriptionScreen} />
       <Stack.Screen name="GoalAnalysis" component={GoalAnalysisScreen} />
       <Stack.Screen name="StatsReveal" component={StatsRevealScreen} />
-      <Stack.Screen name="ExecutionPlan" component={PlaceholderScreen} />
+      <Stack.Screen name="ExecutionPlan" component={ExecutionPlanScreen} />
     </Stack.Navigator>
   );
 }

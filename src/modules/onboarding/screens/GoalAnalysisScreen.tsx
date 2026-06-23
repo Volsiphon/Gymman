@@ -90,12 +90,12 @@ function buildStatCards(
 type Page = 'stats' | 'analysis';
 
 export function GoalAnalysisScreen({ navigation, route }: Props) {
-  const { stats, goalText } = route.params;
+  const { stats, goalText, startOnAnalysis } = route.params;
   const insets = useSafeAreaInsets();
   const calcs = computeBodyStats(stats);
   const statCards = buildStatCards(calcs);
 
-  const [page, setPage] = useState<Page>('stats');
+  const [page, setPage] = useState<Page>(startOnAnalysis ? 'analysis' : 'stats');
   const [analysis, setAnalysis] = useState<GoalAnalysisResult | null>(null);
   const [analysisError, setAnalysisError] = useState(false);
   const [chosenAlternative, setChosenAlternative] = useState(false);
@@ -104,8 +104,8 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
   const [expandedCard, setExpandedCard] = useState<number | null>(null);
 
   // Page-level fade animation
-  const statsOpacity = useRef(new Animated.Value(1)).current;
-  const analysisOpacity = useRef(new Animated.Value(0)).current;
+  const statsOpacity = useRef(new Animated.Value(startOnAnalysis ? 0 : 1)).current;
+  const analysisOpacity = useRef(new Animated.Value(startOnAnalysis ? 1 : 0)).current;
 
   // Stat card entrance animation — staggered
   const cardAnims = useRef(statCards.map(() => new Animated.Value(0))).current;
@@ -227,6 +227,14 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
             <Text style={styles.continueBtnText}>See your goal analysis</Text>
             <Ionicons name="arrow-forward" size={18} color={colors.text.inverse} style={{ marginLeft: 6 }} />
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.ghostBtn}
+            onPress={() => navigation.navigate('StatsReveal', { stats, goalText })}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="body-outline" size={16} color={colors.text.secondary} style={{ marginRight: 6 }} />
+            <Text style={styles.ghostBtnText}>Understand my body's metrics first</Text>
+          </TouchableOpacity>
         </View>
       </Animated.View>
     );
@@ -250,7 +258,7 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
           </Text>
           <TouchableOpacity
             style={[styles.continueBtn, { marginTop: spacing.xl }]}
-            onPress={() => navigation.navigate('StatsReveal', { stats, goalText })}
+            onPress={() => navigation.navigate('ExecutionPlan', { stats, goalText })}
             activeOpacity={0.85}
           >
             <Text style={styles.continueBtnText}>Continue anyway</Text>
@@ -360,7 +368,7 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
 
               <TouchableOpacity
                 style={styles.choiceCard}
-                onPress={() => navigation.navigate('StatsReveal', { stats, goalText })}
+                onPress={() => navigation.navigate('ExecutionPlan', { stats, goalText })}
                 activeOpacity={0.85}
               >
                 <Ionicons name="flame-outline" size={20} color={colors.primaryLight} />
@@ -445,10 +453,10 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
         <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
           <TouchableOpacity
             style={styles.continueBtn}
-            onPress={() => navigation.navigate('StatsReveal', { stats, goalText })}
+            onPress={() => navigation.navigate('ExecutionPlan', { stats, goalText })}
             activeOpacity={0.85}
           >
-            <Text style={styles.continueBtnText}>Build my plan</Text>
+            <Text style={styles.continueBtnText}>Build my execution plan</Text>
             <Ionicons name="arrow-forward" size={18} color={colors.text.inverse} style={{ marginLeft: 6 }} />
           </TouchableOpacity>
         </View>
@@ -595,6 +603,20 @@ const styles = StyleSheet.create({
   continueBtnText: {
     ...typography.bodyMedium,
     color: colors.text.inverse,
+  },
+  ghostBtn: {
+    height: spacing.buttonHeight,
+    borderRadius: radius.button,
+    borderWidth: 1,
+    borderColor: colors.border.strong,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+  },
+  ghostBtnText: {
+    ...typography.bodyMedium,
+    color: colors.text.secondary,
   },
 
   // ─── Loading / error ──────────────────────────────────────────────────────

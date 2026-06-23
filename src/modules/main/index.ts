@@ -1,0 +1,9 @@
+export { PlanScreen } from './screens/PlanScreen';
+export { DietScreen } from './screens/DietScreen';
+export { TrainingScreen } from './screens/TrainingScreen';
+export { CaloryBurnScreen } from './screens/CaloryBurnScreen';
+export { PlaceholderDetailScreen } from './screens/PlaceholderDetailScreen';
+export { ProgressScreen } from './screens/ProgressScreen';
+export { PhotosScreen } from './screens/PhotosScreen';
+export { CoachScreen } from './screens/CoachScreen';
+export { ShopScreen } from './screens/ShopScreen';

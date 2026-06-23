@@ -152,19 +152,19 @@ export function StatsRevealScreen({ navigation, route }: Props) {
       title: 'The honest part: these are educated starting points',
       lines: [
         {
-          value: `Every number on this screen is an estimate. A well-calibrated estimate — but an estimate. Body fat formulas have inherent error margins. Activity multipliers are population averages. Your metabolism may run slightly hotter or cooler than the formula predicts.`,
+          value: `Every number on this screen is an estimate. A well-calibrated and science backed estimate — but an estimate. Body fat formulas have inherent error margins. And your daily activity "sedentary" and "light" or whatever is too rough and general. Your metabolism may run slightly hotter or cooler than the formula predicts.`,
         },
         {
           label: 'How you calibrate them',
-          value: `Real numbers emerge from real data. After 3–4 weeks of logging honest food intake and tracking your weight daily, the trend reveals your true maintenance. If you're eating what the plan says and not moving, the TDEE was off. We adjust. That's normal — that's how it works.`,
+          value: `But Gymman has a solution for you. Just log your daily weight in the app early morning before you eat anything. Use the Calory Burn section in the app to track your actual daily activity level. Log what you eat, log your workouts. Everything is easy and simple in our app. Real numbers emerge from real data. After 3–4 weeks of logging honest food intake and tracking your weight daily, we at Gymman would automatically change your data to the real data. Then, it won't be mere estimates. It will be data backed strategy.`,
           accent: true,
         },
         {
           label: 'What never changes',
-          value: `The direction is never wrong. Whether your maintenance is ${calcs.tdee - 80} or ${calcs.tdee + 80} kcal, the principles are identical. You eat at a deficit to lose fat, a surplus to build muscle, and you protect lean mass either way.`,
+          value: `The direction is never wrong. Whether your maintenance is ${calcs.tdee - 80} or ${calcs.tdee + 80} kcal, the principles are identical. You eat at a deficit to lose fat, a surplus to build muscle, and you protect lean mass either way. And Gymman will always tell you what to do to reach your goal. If confused, just ask Gymman. We have an In-Built 24/7 coach for that very reason.`,
         },
       ],
-      note: 'Think of the first 4–6 weeks as data collection, not just execution. The more honestly you log, the faster the numbers become truly yours.',
+      note: 'Think of the first week as data collection, not just execution. The more honestly you log, the faster the numbers become truly yours.',
     },
     {
       icon: 'trending-up-outline',
@@ -172,18 +172,18 @@ export function StatsRevealScreen({ navigation, route }: Props) {
       title: 'What gets sharper over time',
       lines: [
         {
-          value: `Week 1–2: Baseline is set. The program starts. You're operating on estimates — that's fine.`,
+          value: `Week 1–2: Baseline is set. The app tracks everything about you, and creates your completely realistic numbers and plans.`,
         },
         {
-          value: `Week 3–4: Weight trend emerges. If you're losing ~0.5 kg/week on a 500 kcal deficit, the numbers are accurate. If not — we recalibrate.`,
+          value: `Week 3–4: Weight trend emerges. If you're losing ~0.5 kg/week on a 500 kcal deficit, the numbers are accurate. If not — we recalibrate. The app always does a weekly check, so forever, our algorithm will keep becoming better at working for you.`,
           accent: true,
         },
         {
-          value: `Month 2+: You stop using the formula. Your logged history becomes the data source. Real maintenance within ±50 kcal. Real intake patterns. The estimates have done their job and handed off to evidence.`,
+          value: `Month 2+: You stop using the formula. Your logged history becomes the data source. Now, Gymman knows you better than you do yourself. And it will help you reach that fitness goal. By hook or by crook.`,
         },
         {
           label: 'The goal',
-          value: `A coach's job in session 1 is to build the best possible starting model with the information available. That's what these numbers are. The model gets better. You get sharper. The plan evolves with you.`,
+          value: `A coach's job in session 1 is to build the best possible starting model with the information available. That's what these numbers are. The model gets better. You get sharper. The plan will evolve with you.`,
           accent: true,
         },
       ],
@@ -295,10 +295,10 @@ export function StatsRevealScreen({ navigation, route }: Props) {
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
         <TouchableOpacity
           style={styles.continueBtn}
-          onPress={() => navigation.navigate('ExecutionPlan')}
+          onPress={() => navigation.navigate('GoalAnalysis', { stats, goalText: route.params.goalText, startOnAnalysis: true })}
           activeOpacity={0.85}
         >
-          <Text style={styles.continueBtnText}>Build my execution plan</Text>
+          <Text style={styles.continueBtnText}>Analyse my goal</Text>
           <Ionicons name="arrow-forward" size={18} color={colors.text.inverse} style={{ marginLeft: 6 }} />
         </TouchableOpacity>
       </View>
