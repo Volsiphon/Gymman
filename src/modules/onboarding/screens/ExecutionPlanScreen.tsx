@@ -481,7 +481,7 @@ export function ExecutionPlanScreen({ navigation, route }: Props) {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.ghostBtn}
-          onPress={() => navigation.navigate('GoalDescription', { stats })}
+          onPress={() => navigation.navigate('GoalDescription')}
           activeOpacity={0.7}
         >
           <Ionicons

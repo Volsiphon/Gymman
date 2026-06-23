@@ -228,7 +228,7 @@ export function PhotoCaptureScreen({ navigation, route }: Props) {
       <View style={[styles.actions, { paddingBottom: insets.bottom + spacing.md }]}>
         <TouchableOpacity
           style={[styles.continueBtn, !canContinue && styles.continueBtnDisabled]}
-          onPress={() => navigation.navigate('GoalDescription', { stats: route.params.stats })}
+          onPress={() => navigation.navigate('GoalAnalysis', { stats: route.params.stats, goalText: route.params.goalText })}
           disabled={!canContinue}
           activeOpacity={0.85}
         >
@@ -239,7 +239,7 @@ export function PhotoCaptureScreen({ navigation, route }: Props) {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          onPress={() => navigation.navigate('GoalDescription', { stats: route.params.stats })}
+          onPress={() => navigation.navigate('GoalAnalysis', { stats: route.params.stats, goalText: route.params.goalText })}
           activeOpacity={0.7}
         >
           <Text style={styles.skipText}>Skip for now</Text>

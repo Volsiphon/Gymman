@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
 import type { OnboardingStackParamList } from '@/navigation/navigation';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
@@ -26,6 +27,7 @@ import {
 
 type Props = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'PhysicalStats'>;
+  route: RouteProp<OnboardingStackParamList, 'PhysicalStats'>;
 };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -170,7 +172,7 @@ function TypingDots() {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export function PhysicalStatsScreen({ navigation }: Props) {
+export function PhysicalStatsScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const msgCounter = useRef(0);
@@ -395,7 +397,7 @@ export function PhysicalStatsScreen({ navigation }: Props) {
         {isDone ? (
           <TouchableOpacity
             style={styles.continueBtn}
-            onPress={() => navigation.navigate('PhotoCapture', { stats: answersRef.current as UserPhysicalStats })}
+            onPress={() => navigation.navigate('PhotoCapture', { stats: answersRef.current as UserPhysicalStats, goalText: route.params.goalText })}
             activeOpacity={0.85}
           >
             <Text style={styles.continueBtnText}>Continue</Text>

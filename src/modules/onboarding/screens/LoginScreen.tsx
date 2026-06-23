@@ -58,7 +58,7 @@ export function LoginScreen({ navigation }: Props) {
   const handleContinue = () => {
     if (!isValid) return;
     // TODO: authenticate via username/password
-    navigation.navigate('PhysicalStats');
+    navigation.navigate('Welcome');
   };
 
   const userBorder = userFocus.interpolate({
@@ -73,7 +73,7 @@ export function LoginScreen({ navigation }: Props) {
   return (
     <KeyboardAvoidingView
       style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <StatusBar barStyle="light-content" backgroundColor={colors.bg.app} />
 

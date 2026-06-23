@@ -13,7 +13,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RouteProp } from '@react-navigation/native';
 import type { OnboardingStackParamList } from '@/navigation/navigation';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
@@ -21,7 +20,6 @@ import { spacing, radius } from '@/theme/spacing';
 
 type Props = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'GoalDescription'>;
-  route: RouteProp<OnboardingStackParamList, 'GoalDescription'>;
 };
 
 const MIN_WORDS = 15;
@@ -33,12 +31,11 @@ const PROMPTS = [
   'What does success feel like?',
 ];
 
-export function GoalDescriptionScreen({ navigation, route }: Props) {
+export function GoalDescriptionScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
 
   const [text, setText] = useState('');
-  const [inputHeight, setInputHeight] = useState(220);
 
   const heroAnim = useRef(new Animated.Value(0)).current;
   const formAnim = useRef(new Animated.Value(0)).current;
@@ -56,8 +53,7 @@ export function GoalDescriptionScreen({ navigation, route }: Props) {
   return (
     <KeyboardAvoidingView
       style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={0}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + spacing.xs }]}>
@@ -116,12 +112,9 @@ export function GoalDescriptionScreen({ navigation, route }: Props) {
         >
           <TextInput
             ref={inputRef}
-            style={[styles.textArea, { height: inputHeight }]}
+            style={styles.textArea}
             value={text}
             onChangeText={setText}
-            onContentSizeChange={e =>
-              setInputHeight(Math.max(220, e.nativeEvent.contentSize.height + 32))
-            }
             placeholder={
               "E.g. I want to lose around 12 kg before my cousin's wedding in October. I've tried before but always quit after two weeks. This time I want to actually build a habit and not just crash diet. I'd love to feel confident without a shirt on..."
             }
@@ -156,7 +149,7 @@ export function GoalDescriptionScreen({ navigation, route }: Props) {
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
         <TouchableOpacity
           style={[styles.continueBtn, !isValid && styles.continueBtnDisabled]}
-          onPress={() => navigation.navigate('GoalAnalysis', { stats: route.params.stats, goalText: text })}
+          onPress={() => navigation.navigate('PhysicalStats', { goalText: text })}
           disabled={!isValid}
           activeOpacity={0.85}
         >
@@ -250,7 +243,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border.default,
     padding: spacing.md,
     lineHeight: 24,
-    minHeight: 220,
+    minHeight: 96,
   },
 
   // Word count row
