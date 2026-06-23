@@ -24,13 +24,6 @@ type Props = {
 
 const MIN_WORDS = 15;
 
-const PROMPTS = [
-  'What does your goal look like, exactly?',
-  'When do you want to get there?',
-  'Why does this matter to you right now?',
-  'What does success feel like?',
-];
-
 export function GoalDescriptionScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
@@ -89,15 +82,6 @@ export function GoalDescriptionScreen({ navigation }: Props) {
           <Text style={styles.nudge}>
             The more you write, the better we can build a plan that actually works for you.
           </Text>
-        </Animated.View>
-
-        {/* Prompt chips */}
-        <Animated.View style={[styles.promptRow, { opacity: heroAnim }]}>
-          {PROMPTS.map((p, i) => (
-            <View key={i} style={styles.promptChip}>
-              <Text style={styles.promptText}>{p}</Text>
-            </View>
-          ))}
         </Animated.View>
 
         {/* Text area */}
@@ -207,26 +191,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
     lineHeight: 23,
     fontWeight: '500',
-  },
-
-  // Prompt chips
-  promptRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
-    marginTop: spacing.lg,
-  },
-  promptChip: {
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs,
-  },
-  promptText: {
-    ...typography.footnote,
-    color: colors.text.muted,
   },
 
   // Text area

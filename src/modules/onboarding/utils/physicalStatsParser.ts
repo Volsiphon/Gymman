@@ -1,8 +1,10 @@
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'extreme';
-export type Sex = 'male' | 'female' | 'nonbinary' | 'unspecified';
+export type Sex = 'male' | 'female' | 'other';
 export type QuestionKey =
   | 'name' | 'age' | 'sex' | 'weight' | 'height'
-  | 'activityLevel' | 'activityDescription' | 'neck' | 'waist' | 'hip';
+  | 'neck' | 'waist' | 'hip'
+  | 'country' | 'dietary'
+  | 'activityLevel' | 'activityDescription';
 
 export interface UserPhysicalStats {
   name: string;
@@ -10,10 +12,12 @@ export interface UserPhysicalStats {
   sex: Sex;
   weightKg: number;
   heightCm: number;
-  activityLevel: ActivityLevel;
   neckCm?: number;
   waistCm?: number;
   hipCm?: number;
+  country: string;
+  dietary: string;
+  activityLevel: ActivityLevel;
 }
 
 const titleCase = (s: string) =>
@@ -107,7 +111,8 @@ export function isGibberish(raw: string, q: QuestionKey): boolean {
     if (t.length > 6 && !/[aeiou]/i.test(t)) return true;
   }
   if (q === 'age' && !/\d/.test(t)) return true;
-  if (['weight', 'height', 'neck', 'waist', 'hip'].includes(q) && !/\d/.test(t)) return true;
+  if (['weight', 'height'].includes(q) && !/\d/.test(t)) return true;
+  if (['neck', 'waist', 'hip'].includes(q) && !/\d/.test(t) && !/\b(skip|no|nope|don.?t|idk|pass|n\/a)\b/i.test(t)) return true;
   return false;
 }
 

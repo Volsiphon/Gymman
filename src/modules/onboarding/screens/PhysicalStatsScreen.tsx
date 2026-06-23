@@ -9,7 +9,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Modal,
+  Dimensions,
+  Keyboard,
 } from 'react-native';
+
+const MAX_BUBBLE_W = Dimensions.get('window').width * 0.78;
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -24,6 +29,7 @@ import {
   isGibberish, estimateActivityLevel,
   type ActivityLevel, type Sex, type UserPhysicalStats, type QuestionKey,
 } from '../utils/physicalStatsParser';
+import { onboardingReply } from '@/services/ai/onboardingCoach';
 
 type Props = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'PhysicalStats'>;
@@ -38,6 +44,7 @@ interface Msg {
   id: string;
   type: MsgType;
   text: string;
+  questionKey?: QuestionKey;
 }
 
 interface Choice {
@@ -46,13 +53,19 @@ interface Choice {
   value: string;
 }
 
+interface AnswerHistoryEntry {
+  msgId: string;
+  questionKey: QuestionKey;
+  snapshot: Partial<UserPhysicalStats>;
+  rawText: string;
+}
+
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const SEX_CHOICES: Choice[] = [
   { label: 'Male', value: 'male' },
   { label: 'Female', value: 'female' },
-  { label: 'Non-binary', value: 'nonbinary' },
-  { label: 'Prefer not to say', value: 'unspecified' },
+  { label: 'Other', value: 'other' },
 ];
 
 const ACTIVITY_CHOICES: Choice[] = [
@@ -72,34 +85,77 @@ const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
   extreme: 'Athlete Level',
 };
 
+const USER_MSG_LIMIT = 30;
+
 const FLAG_MESSAGES = [
   "That doesn't look like an answer. Try again.",
   "Still not getting it. One more and your IP gets flagged.",
   "That's three. Your IP is now banned.\n\nJust kidding — but come on, answer the question.",
 ];
 
+const PREAMBLE =
+  "Got it — that's a clear goal to work with. Now give us the basic data about your current physique to help us identify how realistic your goal is. Everyone has different genetics, basic build, and different bodies. We'll use this information to build a practical plan to actually get you to your goal. If your goal is impractical for your body situation, we will also tell you that straightforwardly.\n\nNothing complicated yet, just the basics.";
+
+const ACTIVITY_TRANSITION =
+  "Got it — that's everything I need to gauge where you're starting from. Once your plan is ready, I'll explain it in plain terms first: like how much weight you'd need to lose or gain to get the look you described, or about how long that realistically takes. We'll skip the jargon for now — no calories or macros yet, just the simple version. A few more quick questions first so I can tailor it to your life. :";
+
 function getBotQuestion(q: QuestionKey, name?: string): string {
   switch (q) {
-    case 'name': return "Let's start. What's your name?";
+    case 'name': return "Hey — I'm Gymman. First things first, what should I call you?";
     case 'age': return `Nice to meet you, ${name ?? 'there'}! How old are you?`;
     case 'sex': return "What's your sex or gender?";
     case 'weight': return "How much do you weigh?\n(e.g. 75 kg or 165 lbs)";
     case 'height': return "How tall are you?\n(e.g. 5'10\" or 177 cm)";
+    case 'neck': return "Do you know your neck circumference? Helps estimate body fat.\n(Number in cm/inches, or type 'skip')";
+    case 'waist': return "And your waist? Measure at the narrowest point.\n(Number in cm/inches, or type 'skip')";
+    case 'hip': return "And your hips? Measure at the widest point.\n(Number in cm/inches, or type 'skip')";
+    case 'country': return "Which country or region are you in? This helps me suggest food that's actually available to you.";
+    case 'dietary': return "Any dietary preferences? Vegetarian, vegan, halal, kosher, pescatarian, lactose-free, gluten-free — or just say 'no restrictions'. You can list more than one.";
     case 'activityLevel': return "How active are you on a typical day?";
     case 'activityDescription':
       return "No worries! Just describe a typical day for you — morning to night. I'll figure your activity level from that.";
-    case 'neck':
-      return "Almost done — do you know your neck circumference? Helps estimate body fat.\n(Type a number or say skip)";
-    case 'waist':
-      return "What's your waist circumference? Measure around the narrowest point.\n(Type a number or say skip)";
-    case 'hip':
-      return "And your hip circumference? Measure around the widest point.\n(Type a number or say skip)";
   }
+}
+
+const CORRECTION_RE = /\b(actually|oops|wait|change|update|fix|wrong|meant|correction|make it|no wait|scratch)\b/i;
+
+interface FieldCorrection {
+  apply: (a: Partial<UserPhysicalStats>) => void;
+  summary: string;
+}
+
+function detectFieldCorrection(
+  raw: string,
+  currentQ: QuestionKey,
+  collected: Partial<UserPhysicalStats>,
+): FieldCorrection | null {
+  if (!CORRECTION_RE.test(raw)) return null;
+  if (currentQ !== 'weight' && collected.weightKg !== undefined) {
+    const v = extractWeight(raw);
+    if (v) return { apply: a => { a.weightKg = v.kg; }, summary: `weight changed to ${v.display}` };
+  }
+  if (currentQ !== 'height' && collected.heightCm !== undefined) {
+    const v = extractHeight(raw);
+    if (v) return { apply: a => { a.heightCm = v.cm; }, summary: `height changed to ${v.display}` };
+  }
+  if (currentQ !== 'age' && collected.age !== undefined) {
+    const v = extractAge(raw);
+    if (v !== null) return { apply: a => { a.age = v; }, summary: `age changed to ${v}` };
+  }
+  if (currentQ !== 'country' && collected.country !== undefined && /\b(country|region|from|based)\b/i.test(raw)) {
+    const cleaned = raw.replace(CORRECTION_RE, '').replace(/\b(my|country|region|from|based|in|is|am|i|to|the)\b/gi, '').trim();
+    if (cleaned.length >= 2) return { apply: a => { a.country = cleaned; }, summary: `country changed to ${cleaned}` };
+  }
+  if (currentQ !== 'dietary' && collected.dietary !== undefined && /\b(diet|dietary|eat|vegan|vegetarian|halal|kosher|restriction|pescatarian|gluten)\b/i.test(raw)) {
+    const cleaned = raw.replace(CORRECTION_RE, '').trim();
+    if (cleaned.length >= 2) return { apply: a => { a.dietary = cleaned; }, summary: `dietary updated` };
+  }
+  return null;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function MessageBubble({ msg }: { msg: Msg }) {
+function MessageBubble({ msg, onLongPressEdit }: { msg: Msg; onLongPressEdit?: (msgId: string) => void }) {
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(8)).current;
 
@@ -120,6 +176,16 @@ function MessageBubble({ msg }: { msg: Msg }) {
     );
   }
 
+  const canEdit = msg.type === 'user' && !!msg.questionKey && !!onLongPressEdit;
+
+  const bubble = (
+    <View style={[styles.bubble, msg.type === 'user' ? styles.bubbleUser : styles.bubbleBot]}>
+      <Text style={[styles.bubbleText, msg.type === 'user' && styles.bubbleTextUser]}>
+        {msg.text}
+      </Text>
+    </View>
+  );
+
   return (
     <Animated.View
       style={[
@@ -128,11 +194,18 @@ function MessageBubble({ msg }: { msg: Msg }) {
         { opacity: fade, transform: [{ translateY: slide }] },
       ]}
     >
-      <View style={[styles.bubble, msg.type === 'user' ? styles.bubbleUser : styles.bubbleBot]}>
-        <Text style={[styles.bubbleText, msg.type === 'user' && styles.bubbleTextUser]}>
-          {msg.text}
-        </Text>
-      </View>
+      {canEdit
+        ? (
+          <TouchableOpacity
+            onLongPress={() => onLongPressEdit!(msg.id)}
+            delayLongPress={450}
+            activeOpacity={0.85}
+          >
+            {bubble}
+          </TouchableOpacity>
+        )
+        : bubble
+      }
     </Animated.View>
   );
 }
@@ -177,6 +250,8 @@ export function PhysicalStatsScreen({ navigation, route }: Props) {
   const scrollRef = useRef<ScrollView>(null);
   const msgCounter = useRef(0);
   const answersRef = useRef<Partial<UserPhysicalStats>>({});
+  const userMsgCountRef = useRef(0);
+  const restartCountRef = useRef(0);
 
   const [messages, setMessages] = useState<Msg[]>([]);
   const [currentQ, setCurrentQ] = useState<QuestionKey>('name');
@@ -186,17 +261,111 @@ export function PhysicalStatsScreen({ navigation, route }: Props) {
   const [isDone, setIsDone] = useState(false);
   const [choices, setChoices] = useState<Choice[] | null>(null);
 
-  const addMsg = useCallback((type: MsgType, text: string) => {
-    setMessages(prev => [...prev, { id: String(++msgCounter.current), type, text }]);
+  const addMsg = useCallback((type: MsgType, text: string, questionKey?: QuestionKey): string => {
+    const id = String(++msgCounter.current);
+    if (type === 'user') userMsgCountRef.current++;
+    setMessages(prev => [...prev, { id, type, text, questionKey }]);
+    return id;
   }, []);
 
+  const answerHistoryRef = useRef<AnswerHistoryEntry[]>([]);
+  const editCountRef = useRef(0);
+  const [editCount, setEditCount] = useState(0);
+  const [selectedMsgId, setSelectedMsgId] = useState<string | null>(null);
+  const [warningMsg, setWarningMsg] = useState<string | null>(null);
+  const warningAnim = useRef(new Animated.Value(0)).current;
+
+  const showWarning = useCallback((msg: string) => {
+    warningAnim.stopAnimation();
+    warningAnim.setValue(0);
+    setWarningMsg(msg);
+    Animated.sequence([
+      Animated.timing(warningAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.delay(2200),
+      Animated.timing(warningAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]).start(({ finished }) => { if (finished) setWarningMsg(null); });
+  }, [warningAnim]);
+
+  const rollBackTo = useCallback((msgId: string) => {
+    if (editCountRef.current >= 3) return;
+    const idx = answerHistoryRef.current.findIndex(e => e.msgId === msgId);
+    if (idx === -1) return;
+    const entry = answerHistoryRef.current[idx];
+    answersRef.current = { ...entry.snapshot };
+    answerHistoryRef.current = answerHistoryRef.current.slice(0, idx);
+    setMessages(prev => {
+      const i = prev.findIndex(m => m.id === msgId);
+      return i === -1 ? prev : prev.slice(0, i);
+    });
+    setCurrentQ(entry.questionKey);
+    setInputText(entry.rawText);
+    setIsDone(false);
+    setIsTyping(false);
+    if (entry.questionKey === 'sex') setChoices(SEX_CHOICES);
+    else if (entry.questionKey === 'activityLevel') setChoices(ACTIVITY_CHOICES);
+    else setChoices(null);
+    editCountRef.current++;
+    setEditCount(editCountRef.current);
+    const remaining = 3 - editCountRef.current;
+    showWarning(
+      remaining === 0 ? 'No more edits allowed.'
+      : remaining === 1 ? '1 edit remaining.'
+      : `${remaining} edits remaining.`
+    );
+  }, [showWarning]);
+
+  const resetChat = useCallback(() => {
+    answersRef.current = {};
+    answerHistoryRef.current = [];
+    editCountRef.current = 0;
+    userMsgCountRef.current = 0;
+    msgCounter.current = 0;
+    setEditCount(0);
+    setMessages([]);
+    setCurrentQ('name');
+    setStrikes(0);
+    setIsDone(false);
+    setChoices(null);
+    setInputText('');
+    setSelectedMsgId(null);
+    setTimeout(() => addMsg('bot', PREAMBLE), 350);
+    setTimeout(() => setIsTyping(true), 900);
+    setTimeout(() => { setIsTyping(false); addMsg('bot', getBotQuestion('name')); }, 1800);
+  }, [addMsg]);
+
+  const triggerLimit = useCallback(() => {
+    setChoices(null);
+    setIsTyping(false);
+    if (restartCountRef.current >= 1) {
+      addMsg('flag', "You've hit the cap twice. Keep this up and your account will be flagged. This session is now locked.");
+      setIsDone(true);
+      return;
+    }
+    restartCountRef.current++;
+    addMsg('flag', "Just a heads-up — this is a quick stats intake, not an open chat. You've gone over the message limit. Restarting.");
+    setTimeout(() => resetChat(), 2800);
+  }, [addMsg, resetChat]);
+
   useEffect(() => {
-    setTimeout(() => addMsg('bot', getBotQuestion('name')), 350);
+    setTimeout(() => addMsg('bot', PREAMBLE), 350);
+    setTimeout(() => setIsTyping(true), 900);
+    setTimeout(() => {
+      setIsTyping(false);
+      addMsg('bot', getBotQuestion('name'));
+    }, 1800);
   }, []);
 
   useEffect(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
   }, [messages, isTyping]);
+
+  useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100),
+    );
+    return () => show.remove();
+  }, []);
 
   const proceed = useCallback((nextQ: QuestionKey | 'done', ack?: string) => {
     if (ack) {
@@ -208,15 +377,20 @@ export function PhysicalStatsScreen({ navigation, route }: Props) {
 
     if (nextQ === 'done') {
       const a = answersRef.current;
+      const bodyLines = [
+        a.neckCm ? `Neck: ${a.neckCm} cm` : null,
+        a.waistCm ? `Waist: ${a.waistCm} cm` : null,
+        a.hipCm ? `Hips: ${a.hipCm} cm` : null,
+      ].filter(Boolean).join('  ·  ');
       const summary =
         `You're all set, ${a.name}!\n\n` +
         `Name: ${a.name}, ${a.age} years old\n` +
         `Sex: ${a.sex}\n` +
         `Weight: ${a.weightKg} kg  ·  Height: ${a.heightCm} cm\n` +
-        `Activity: ${ACTIVITY_LABELS[a.activityLevel!]}\n` +
-        (a.neckCm ? `Neck: ${a.neckCm} cm` : 'Neck: not set') + '\n' +
-        (a.waistCm ? `Waist: ${a.waistCm} cm` : 'Waist: not set') +
-        (a.hipCm ? `\nHip: ${a.hipCm} cm` : '');
+        (bodyLines ? `${bodyLines}\n` : '') +
+        `Country: ${a.country}\n` +
+        `Diet: ${a.dietary}\n` +
+        `Activity: ${ACTIVITY_LABELS[a.activityLevel!]}`;
       setIsTyping(false);
       addMsg('bot', summary);
       setIsDone(true);
@@ -231,12 +405,65 @@ export function PhysicalStatsScreen({ navigation, route }: Props) {
     else setChoices(null);
   }, [addMsg]);
 
+  const advanceAfterAI = useCallback((aiText: string, nextQ: QuestionKey | 'done') => {
+    setIsTyping(false);
+    addMsg('bot', aiText);
+    if (nextQ === 'done') { setIsDone(true); return; }
+    setCurrentQ(nextQ);
+    if (nextQ === 'sex') setChoices(SEX_CHOICES);
+    else if (nextQ === 'activityLevel') setChoices(ACTIVITY_CHOICES);
+    else setChoices(null);
+  }, [addMsg]);
+
   const processTextAnswer = useCallback((raw: string) => {
     const q = currentQ;
     const currentStrikes = strikes;
 
     setInputText('');
-    addMsg('user', raw);
+
+    // ── Inline field correction ───────────────────────────────────────────────
+    if (editCountRef.current < 3) {
+      const correction = detectFieldCorrection(raw, q, answersRef.current);
+      if (correction) {
+        addMsg('user', raw);
+        setIsTyping(true);
+        correction.apply(answersRef.current);
+        editCountRef.current++;
+        setEditCount(editCountRef.current);
+        const remaining = 3 - editCountRef.current;
+        showWarning(
+          remaining === 0 ? 'No more edits allowed.'
+          : remaining === 1 ? '1 edit remaining.'
+          : `${remaining} edits remaining.`
+        );
+        onboardingReply({
+          goalText: route.params.goalText,
+          collected: { ...answersRef.current },
+          justAnswered: q,
+          userRaw: raw,
+          nextQ: q,
+          correction: correction.summary,
+        })
+          .then(aiText => {
+            setIsTyping(false);
+            addMsg('bot', aiText);
+            if (q === 'sex') setChoices(SEX_CHOICES);
+            else if (q === 'activityLevel') setChoices(ACTIVITY_CHOICES);
+          })
+          .catch(() => {
+            setIsTyping(false);
+            addMsg('bot', `Got it — ${correction.summary}.`);
+            if (q === 'sex') setChoices(SEX_CHOICES);
+            else if (q === 'activityLevel') setChoices(ACTIVITY_CHOICES);
+          });
+        return;
+      }
+    }
+
+    // ── Normal answer processing ──────────────────────────────────────────────
+    const snapshotBefore = { ...answersRef.current };
+    const userMsgId = addMsg('user', raw, q);
+    if (userMsgCountRef.current >= USER_MSG_LIMIT) { triggerLimit(); return; }
     setIsTyping(true);
 
     if (isGibberish(raw, q)) {
@@ -249,122 +476,127 @@ export function PhysicalStatsScreen({ navigation, route }: Props) {
       return;
     }
 
-    setTimeout(() => {
-      let ack: string | undefined;
-      let nextQ: QuestionKey | 'done';
-      let ok = false;
+    let ack: string | undefined;
+    let nextQ: QuestionKey | 'done' = q;
+    let ok = false;
 
-      switch (q) {
-        case 'name': {
-          const v = extractName(raw);
-          if (v) { answersRef.current.name = v; nextQ = 'age'; ok = true; }
-          else nextQ = 'name';
-          break;
-        }
-        case 'age': {
-          const v = extractAge(raw);
-          if (v !== null) { answersRef.current.age = v; nextQ = 'sex'; ok = true; }
-          else nextQ = 'age';
-          break;
-        }
-        case 'weight': {
-          const v = extractWeight(raw);
-          if (v) { answersRef.current.weightKg = v.kg; ack = `Noted — ${v.display}.`; nextQ = 'height'; ok = true; }
-          else nextQ = 'weight';
-          break;
-        }
-        case 'height': {
-          const v = extractHeight(raw);
-          if (v) { answersRef.current.heightCm = v.cm; ack = `Got it — ${v.display}.`; nextQ = 'activityLevel'; ok = true; }
-          else nextQ = 'height';
-          break;
-        }
-        case 'activityDescription': {
-          const level = estimateActivityLevel(raw);
-          answersRef.current.activityLevel = level;
-          ack = `Based on that, marking you as ${ACTIVITY_LABELS[level]}.`;
-          nextQ = 'neck';
-          ok = true;
-          break;
-        }
-        case 'neck': {
-          const v = extractNeck(raw);
-          if (v === 'skip') {
-            ack = "No problem.";
-            nextQ = 'waist'; ok = true;
-          } else if (v !== null) {
-            answersRef.current.neckCm = v;
-            ack = `Noted — ${v} cm.`;
-            nextQ = 'waist'; ok = true;
-          } else nextQ = 'neck';
-          break;
-        }
-        case 'waist': {
-          const v = extractWaist(raw);
-          const sex = answersRef.current.sex;
-          const afterWaist: QuestionKey | 'done' =
-            (sex === 'female' || sex === 'nonbinary') ? 'hip' : 'done';
-          if (v === 'skip') {
-            ack = "Okay, skipping.";
-            nextQ = afterWaist; ok = true;
-          } else if (v !== null) {
-            answersRef.current.waistCm = v;
-            ack = `Noted — ${v} cm.`;
-            nextQ = afterWaist; ok = true;
-          } else nextQ = 'waist';
-          break;
-        }
-        case 'hip': {
-          const v = extractHip(raw);
-          if (v === 'skip') {
-            ack = "Got it.";
-            nextQ = 'done'; ok = true;
-          } else if (v !== null) {
-            answersRef.current.hipCm = v;
-            ack = `Noted — ${v} cm.`;
-            nextQ = 'done'; ok = true;
-          } else nextQ = 'hip';
-          break;
-        }
-        default:
-          nextQ = q;
+    switch (q) {
+      case 'name': {
+        const v = extractName(raw);
+        if (v) { answersRef.current.name = v; nextQ = 'age'; ok = true; }
+        break;
       }
+      case 'age': {
+        const v = extractAge(raw);
+        if (v !== null) { answersRef.current.age = v; nextQ = 'sex'; ok = true; }
+        break;
+      }
+      case 'weight': {
+        const v = extractWeight(raw);
+        if (v) { answersRef.current.weightKg = v.kg; ack = `Noted — ${v.display}.`; nextQ = 'height'; ok = true; }
+        break;
+      }
+      case 'height': {
+        const v = extractHeight(raw);
+        if (v) { answersRef.current.heightCm = v.cm; ack = `Got it — ${v.display}.`; nextQ = 'neck'; ok = true; }
+        break;
+      }
+      case 'neck': {
+        const v = extractNeck(raw);
+        if (v === 'skip') { nextQ = 'waist'; ok = true; }
+        else if (v !== null) { answersRef.current.neckCm = v; ack = `Noted — ${v} cm.`; nextQ = 'waist'; ok = true; }
+        break;
+      }
+      case 'waist': {
+        const v = extractWaist(raw);
+        const sex = answersRef.current.sex;
+        const afterWaist: QuestionKey = (sex === 'female' || sex === 'other') ? 'hip' : 'country';
+        if (v === 'skip') { nextQ = afterWaist; ok = true; }
+        else if (v !== null) { answersRef.current.waistCm = v; ack = `Noted — ${v} cm.`; nextQ = afterWaist; ok = true; }
+        break;
+      }
+      case 'hip': {
+        const v = extractHip(raw);
+        if (v === 'skip') { nextQ = 'country'; ok = true; }
+        else if (v !== null) { answersRef.current.hipCm = v; ack = `Noted — ${v} cm.`; nextQ = 'country'; ok = true; }
+        break;
+      }
+      case 'country': {
+        answersRef.current.country = raw.trim();
+        nextQ = 'dietary'; ok = true;
+        break;
+      }
+      case 'dietary': {
+        answersRef.current.dietary = raw.trim();
+        ack = ACTIVITY_TRANSITION;
+        nextQ = 'activityLevel'; ok = true;
+        break;
+      }
+      case 'activityDescription': {
+        const level = estimateActivityLevel(raw);
+        answersRef.current.activityLevel = level;
+        ack = `Based on that, marking you as ${ACTIVITY_LABELS[level]}.`;
+        nextQ = 'done'; ok = true;
+        break;
+      }
+    }
 
-      if (!ok) {
+    if (!ok) {
+      setTimeout(() => {
         const ns = currentStrikes + 1;
         setStrikes(ns >= 3 ? 0 : ns);
         setIsTyping(false);
         addMsg(ns >= 3 ? 'ban' : 'flag', FLAG_MESSAGES[Math.min(ns - 1, 2)]);
-        return;
-      }
+      }, 500);
+      return;
+    }
 
-      setStrikes(0);
-      proceed(nextQ, ack);
-    }, 500);
-  }, [currentQ, strikes, addMsg, proceed]);
+    setStrikes(0);
+    answerHistoryRef.current.push({ msgId: userMsgId, questionKey: q, snapshot: snapshotBefore, rawText: raw });
+    onboardingReply({
+      goalText: route.params.goalText,
+      collected: { ...answersRef.current },
+      justAnswered: q,
+      userRaw: raw,
+      nextQ,
+    })
+      .then(aiText => advanceAfterAI(aiText, nextQ))
+      .catch(() => proceed(nextQ, ack));
+  }, [currentQ, strikes, addMsg, proceed, advanceAfterAI, route.params.goalText, showWarning, triggerLimit]);
 
   const processChoiceAnswer = useCallback((value: string, label: string) => {
-    addMsg('user', label);
+    const q = currentQ;
+    const snapshotBefore = { ...answersRef.current };
+    const userMsgId = addMsg('user', label, q);
+    if (userMsgCountRef.current >= USER_MSG_LIMIT) { triggerLimit(); return; }
     setChoices(null);
     setIsTyping(true);
 
-    setTimeout(() => {
-      let nextQ: QuestionKey | 'done';
-      switch (currentQ) {
-        case 'sex':
-          answersRef.current.sex = value as Sex;
-          nextQ = 'weight';
-          break;
-        case 'activityLevel':
-          if (value !== 'not_sure') answersRef.current.activityLevel = value as ActivityLevel;
-          nextQ = value === 'not_sure' ? 'activityDescription' : 'neck';
-          break;
-        default:
-          nextQ = 'name';
-      }
-      proceed(nextQ);
-    }, 500);
-  }, [currentQ, addMsg, proceed]);
+    let nextQ: QuestionKey | 'done';
+    switch (q) {
+      case 'sex':
+        answersRef.current.sex = value as Sex;
+        nextQ = 'weight';
+        break;
+      case 'activityLevel':
+        if (value !== 'not_sure') answersRef.current.activityLevel = value as ActivityLevel;
+        nextQ = value === 'not_sure' ? 'activityDescription' : 'done';
+        break;
+      default:
+        nextQ = 'name';
+    }
+
+    answerHistoryRef.current.push({ msgId: userMsgId, questionKey: q, snapshot: snapshotBefore, rawText: '' });
+    onboardingReply({
+      goalText: route.params.goalText,
+      collected: { ...answersRef.current },
+      justAnswered: q,
+      userRaw: label,
+      nextQ,
+    })
+      .then(aiText => advanceAfterAI(aiText, nextQ))
+      .catch(() => proceed(nextQ));
+  }, [currentQ, addMsg, proceed, advanceAfterAI, route.params.goalText, triggerLimit]);
 
   return (
     <KeyboardAvoidingView
@@ -389,9 +621,22 @@ export function PhysicalStatsScreen({ navigation, route }: Props) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {messages.map(msg => <MessageBubble key={msg.id} msg={msg} />)}
+        {messages.map(msg => (
+          <MessageBubble
+            key={msg.id}
+            msg={msg}
+            onLongPressEdit={editCount < 3 ? setSelectedMsgId : undefined}
+          />
+        ))}
         {isTyping && <TypingDots />}
       </ScrollView>
+
+      {warningMsg !== null && (
+        <Animated.View style={[styles.warningToast, { opacity: warningAnim }]}>
+          <Ionicons name="warning-outline" size={12} color={colors.gold} />
+          <Text style={styles.warningText}>{warningMsg}</Text>
+        </Animated.View>
+      )}
 
       <View style={[styles.inputArea, { paddingBottom: insets.bottom + spacing.xs }]}>
         {isDone ? (
@@ -453,6 +698,32 @@ export function PhysicalStatsScreen({ navigation, route }: Props) {
           </View>
         )}
       </View>
+      <Modal
+        visible={selectedMsgId !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedMsgId(null)}
+      >
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={() => setSelectedMsgId(null)}
+        >
+          <View style={[styles.actionCard, { paddingBottom: insets.bottom + spacing.md }]}>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              activeOpacity={0.7}
+              onPress={() => {
+                if (selectedMsgId) rollBackTo(selectedMsgId);
+                setSelectedMsgId(null);
+              }}
+            >
+              <Ionicons name="create-outline" size={20} color={colors.text.primary} />
+              <Text style={styles.actionBtnText}>Edit message</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -500,7 +771,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   bubble: {
-    maxWidth: '80%',
+    maxWidth: MAX_BUBBLE_W,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
@@ -631,5 +902,50 @@ const styles = StyleSheet.create({
   continueBtnText: {
     ...typography.bodyMedium,
     color: colors.text.inverse,
+  },
+
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  actionCard: {
+    marginHorizontal: spacing.screenPadding,
+    marginBottom: spacing.md,
+    backgroundColor: colors.bg.elevated,
+    borderRadius: radius.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border.default,
+    overflow: 'hidden',
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md + 2,
+  },
+  actionBtnText: {
+    ...typography.callout,
+    color: colors.text.primary,
+  },
+
+  warningToast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    alignSelf: 'center',
+    backgroundColor: colors.bg.elevated,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.gold + '50',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    marginBottom: spacing.xs,
+    marginHorizontal: spacing.screenPadding,
+  },
+  warningText: {
+    ...typography.footnote,
+    color: colors.gold,
   },
 });
