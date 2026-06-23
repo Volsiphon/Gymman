@@ -78,6 +78,51 @@ function SectionCard({
   );
 }
 
+// ─── Verdict card (Section 1) ─────────────────────────────────────────────────
+
+function VerdictCard({
+  verdict,
+  isFeasible,
+  journey,
+}: {
+  verdict: string;
+  isFeasible?: boolean;
+  journey?: GoalJourney;
+}) {
+  const feasible = isFeasible !== false;
+  const accentColor = feasible ? colors.success : colors.gold;
+  const badgeIcon = feasible ? 'checkmark-circle-outline' : 'alert-circle-outline';
+  const badgeLabel = feasible ? 'ACHIEVABLE' : "LET'S REDIRECT";
+
+  return (
+    <View style={[styles.card, { borderColor: accentColor + '55' }]}>
+      <View style={styles.cardHeader}>
+        <View style={[styles.iconWrap, { backgroundColor: accentColor + '22' }]}>
+          <Ionicons name={badgeIcon as any} size={18} color={accentColor} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.cardLabel}>FEASIBILITY CHECK</Text>
+          <Text style={[styles.cardTitle, { color: accentColor }]}>{badgeLabel}</Text>
+        </View>
+      </View>
+      <View style={styles.cardDivider} />
+      <Text style={styles.bodyText}>{verdict}</Text>
+      {journey && feasible && (
+        <>
+          <View style={[styles.cardDivider, { marginTop: spacing.md }]} />
+          <View style={styles.verdictMeta}>
+            <Ionicons name="time-outline" size={14} color={colors.gold} />
+            <Text style={styles.verdictMetaText}>
+              Timeline:{' '}
+              <Text style={{ color: colors.gold, fontWeight: '600' }}>{journey.timelineText}</Text>
+            </Text>
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
+
 // ─── Journey card ─────────────────────────────────────────────────────────────
 
 function JourneyCard({
@@ -154,13 +199,6 @@ function JourneyCard({
       <View style={[styles.cardDivider, { marginTop: spacing.md }]} />
 
       <View style={styles.journeyMeta}>
-        <Ionicons name="time-outline" size={14} color={colors.gold} />
-        <Text style={styles.journeyMetaText}>
-          Timeline:{' '}
-          <Text style={{ color: colors.gold, fontWeight: '600' }}>{journey.timelineText}</Text>
-        </Text>
-      </View>
-      <View style={[styles.journeyMeta, { marginTop: spacing.xs }]}>
         <Ionicons name="flash-outline" size={14} color={colors.info} />
         <Text style={styles.journeyMetaText}>{journey.earlyWins}</Text>
       </View>
@@ -192,6 +230,15 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
     undefined;
 
   const isRehab = result?.goalType === 'rehabilitation';
+
+  function runAnalysis() {
+    setError(null);
+    setLoading(true);
+    analyzeGoal(stats, goalText, calcs)
+      .then(setResult)
+      .catch(() => setError('Something went wrong analysing your goal. Please try again.'))
+      .finally(() => setLoading(false));
+  }
 
   return (
     <View style={styles.root}>
@@ -230,17 +277,7 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
           <View style={styles.errorBox}>
             <Ionicons name="alert-circle-outline" size={40} color={colors.danger} />
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity
-              style={styles.retryBtn}
-              onPress={() => {
-                setError(null);
-                setLoading(true);
-                analyzeGoal(stats, goalText, calcs)
-                  .then(setResult)
-                  .catch(() => setError('Something went wrong analysing your goal. Please try again.'))
-                  .finally(() => setLoading(false));
-              }}
-            >
+            <TouchableOpacity style={styles.retryBtn} onPress={runAnalysis}>
               <Text style={styles.retryBtnText}>Try again</Text>
             </TouchableOpacity>
           </View>
@@ -259,8 +296,17 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
               </Text>
             </View>
 
-            {/* ── Section 1: Simple summary ────────────────────────────────── */}
-            {result.goalSimplified && (
+            {/* ── Section 1: Verdict ───────────────────────────────────────── */}
+            {!isRehab && result.realisticVerdict && (
+              <VerdictCard
+                verdict={result.realisticVerdict}
+                isFeasible={result.isFeasible}
+                journey={journey}
+              />
+            )}
+
+            {/* ── Section 2: Simplified goal ───────────────────────────────── */}
+            {!isRehab && result.isFeasible !== false && result.goalSimplified && (
               <SectionCard
                 icon="flag-outline"
                 iconColor={colors.primaryLight}
@@ -271,16 +317,27 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
               </SectionCard>
             )}
 
-            {/* ── Section 2: What the goal really means ────────────────────── */}
+            {/* ── Section 2 (infeasible): Alternative simplified ───────────── */}
+            {!isRehab && result.isFeasible === false && result.alternativeGoal && (
+              <SectionCard
+                icon="rocket-outline"
+                iconColor={colors.primaryLight}
+                label="YOUR ACTUAL TARGET"
+                title={result.alternativeGoal.title}
+                accent
+              >
+                <Text style={styles.salesPitch}>{result.alternativeGoal.salesPitch}</Text>
+                <View style={styles.cardDivider} />
+                <Paragraphs text={result.alternativeGoal.goalSimplified} />
+              </SectionCard>
+            )}
+
+            {/* ── Section 3: Complete analysis ─────────────────────────────── */}
             <SectionCard
               icon="telescope-outline"
               iconColor={colors.info}
-              label="WHAT IT ACTUALLY MEANS"
-              title={
-                isRehab
-                  ? 'Understanding your goal'
-                  : 'Breaking it down'
-              }
+              label={isRehab ? 'UNDERSTANDING YOUR GOAL' : 'WHAT YOUR GOAL REALLY MEANS'}
+              title={isRehab ? 'Understanding your goal' : 'The full picture'}
             >
               <Paragraphs text={result.goalInterpretation} />
             </SectionCard>
@@ -297,64 +354,35 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
               </SectionCard>
             )}
 
-            {/* ── Section 3: Feasible — your path ─────────────────────────── */}
-            {!isRehab && result.isFeasible && result.personalizedBreakdown && (
+            {/* ── Section 4: Your Situation ────────────────────────────────── */}
+            {!isRehab && result.situationAnalysis && (
               <SectionCard
-                icon="calculator-outline"
-                iconColor={colors.success}
-                label="YOUR PATH TO GET THERE"
-                title="What it looks like for you"
+                icon="person-outline"
+                iconColor={colors.gold}
+                label="YOUR SITUATION"
+                title="What this means for you"
               >
-                {result.feasibilityNote && (
-                  <Text style={[styles.feasibilityNote, { marginBottom: spacing.sm }]}>
-                    {result.feasibilityNote}
-                  </Text>
-                )}
-                <Paragraphs text={result.personalizedBreakdown} />
+                <Paragraphs text={result.situationAnalysis} />
               </SectionCard>
             )}
 
-            {/* ── Section 3: Not feasible — alternative + foundation ──────── */}
-            {!isRehab && result.isFeasible === false && (
-              <>
-                {result.feasibilityNote && (
-                  <View style={styles.infeasibleNote}>
-                    <Ionicons name="alert-circle-outline" size={16} color={colors.gold} />
-                    <Text style={styles.infeasibleNoteText}>{result.feasibilityNote}</Text>
-                  </View>
-                )}
+            {/* ── Foundation goal (infeasible path only) ───────────────────── */}
+            {!isRehab && result.isFeasible === false && result.foundationGoal && (
+              <SectionCard
+                icon="layers-outline"
+                iconColor={colors.info}
+                label="YOUR NATURAL PEAK"
+                title={result.foundationGoal.title}
+              >
+                <Text style={styles.rationaleText}>{result.foundationGoal.rationale}</Text>
+                <View style={styles.cardDivider} />
+                <Paragraphs text={result.foundationGoal.goalSimplified} />
+              </SectionCard>
+            )}
 
-                {result.alternativeGoal && (
-                  <SectionCard
-                    icon="rocket-outline"
-                    iconColor={colors.primaryLight}
-                    label="WE RECOMMEND THIS INSTEAD"
-                    title={result.alternativeGoal.title}
-                    accent
-                  >
-                    <Text style={styles.salesPitch}>{result.alternativeGoal.salesPitch}</Text>
-                    <View style={styles.cardDivider} />
-                    <Paragraphs text={result.alternativeGoal.goalSimplified} />
-                    <View style={styles.cardDivider} />
-                    <Paragraphs text={result.alternativeGoal.personalizedBreakdown} />
-                  </SectionCard>
-                )}
-
-                {result.foundationGoal && (
-                  <SectionCard
-                    icon="layers-outline"
-                    iconColor={colors.info}
-                    label="YOUR FOUNDATION GOAL"
-                    title={result.foundationGoal.title}
-                  >
-                    <Text style={styles.rationaleText}>{result.foundationGoal.rationale}</Text>
-                    <View style={styles.cardDivider} />
-                    <Paragraphs text={result.foundationGoal.goalSimplified} />
-                    <View style={styles.cardDivider} />
-                    <Paragraphs text={result.foundationGoal.personalizedBreakdown} />
-                  </SectionCard>
-                )}
-              </>
+            {/* ── Journey: Now and Target ───────────────────────────────────── */}
+            {journey && !isRehab && (
+              <JourneyCard stats={stats} calcs={calcs} journey={journey} />
             )}
 
             {/* ── Education ────────────────────────────────────────────────── */}
@@ -362,11 +390,6 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
               <Text style={styles.educationTitle}>{result.educationTitle}</Text>
               <Paragraphs text={result.educationContent} style={styles.educationBody} />
             </View>
-
-            {/* ── Journey: Now and Target ───────────────────────────────────── */}
-            {journey && !isRehab && (
-              <JourneyCard stats={stats} calcs={calcs} journey={journey} />
-            )}
 
             {/* ── Transition text ──────────────────────────────────────────── */}
             <Text style={styles.transitionText}>
@@ -554,31 +577,19 @@ const styles = StyleSheet.create({
     lineHeight: 23,
   },
 
-  // ── Feasibility + infeasible notes ───────────────────────────────────────────
-  feasibilityNote: {
-    ...typography.footnote,
-    color: colors.success,
-    lineHeight: 19,
-    fontStyle: 'italic',
-  },
-  infeasibleNote: {
+  // ── Verdict card meta ────────────────────────────────────────────────────────
+  verdictMeta: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
-    alignItems: 'flex-start',
-    backgroundColor: colors.goldMuted,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.gold + '40',
-    padding: spacing.md,
   },
-  infeasibleNoteText: {
+  verdictMetaText: {
     ...typography.footnote,
-    color: colors.gold,
-    flex: 1,
+    color: colors.text.muted,
     lineHeight: 19,
   },
 
-  // ── Sales pitch / rationale (infeasible path) ─────────────────────────────────
+  // ── Sales pitch / rationale ───────────────────────────────────────────────────
   salesPitch: {
     ...typography.callout,
     color: colors.primaryLight,
