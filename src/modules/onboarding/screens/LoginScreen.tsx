@@ -23,52 +23,141 @@ type Props = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'Login'>;
 };
 
+type Mode = 'login' | 'signup';
+
+// ─── Labelled input ───────────────────────────────────────────────────────────
+
+function LabeledInput({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  secureEntry,
+  keyboardType,
+  returnKeyType,
+  onSubmit,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  placeholder?: string;
+  secureEntry?: boolean;
+  keyboardType?: React.ComponentProps<typeof TextInput>['keyboardType'];
+  returnKeyType?: React.ComponentProps<typeof TextInput>['returnKeyType'];
+  onSubmit?: () => void;
+}) {
+  const [focused, setFocused] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const borderAnim = useRef(new Animated.Value(0)).current;
+
+  const handleFocus = () => {
+    setFocused(true);
+    Animated.timing(borderAnim, { toValue: 1, duration: 180, useNativeDriver: false }).start();
+  };
+  const handleBlur = () => {
+    setFocused(false);
+    Animated.timing(borderAnim, { toValue: 0, duration: 180, useNativeDriver: false }).start();
+  };
+
+  const borderColor = borderAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [colors.border.default, colors.primary],
+  });
+
+  return (
+    <View style={inputStyles.wrap}>
+      <Text style={inputStyles.label}>{label}</Text>
+      <Animated.View style={[inputStyles.field, { borderColor }]}>
+        <TextInput
+          style={inputStyles.input}
+          value={value}
+          onChangeText={onChangeText}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          placeholder={placeholder}
+          placeholderTextColor={colors.text.disabled}
+          secureTextEntry={secureEntry && !visible}
+          keyboardType={keyboardType}
+          returnKeyType={returnKeyType ?? 'next'}
+          autoCapitalize="none"
+          autoCorrect={false}
+          onSubmitEditing={onSubmit}
+          selectionColor={colors.primary}
+        />
+        {secureEntry && (
+          <TouchableOpacity onPress={() => setVisible(v => !v)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons
+              name={visible ? 'eye-off-outline' : 'eye-outline'}
+              size={18}
+              color={colors.text.muted}
+            />
+          </TouchableOpacity>
+        )}
+      </Animated.View>
+    </View>
+  );
+}
+
+const inputStyles = StyleSheet.create({
+  wrap: {
+    gap: 6,
+  },
+  label: {
+    ...typography.label,
+    color: colors.text.muted,
+  },
+  field: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bg.elevated,
+    borderRadius: radius.input,
+    borderWidth: 1,
+    height: spacing.inputHeight,
+    paddingHorizontal: spacing.md,
+  },
+  input: {
+    flex: 1,
+    ...typography.callout,
+    color: colors.text.primary,
+    padding: 0,
+  },
+});
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
+
 export function LoginScreen({ navigation }: Props) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [mode, setMode] = useState<Mode>('login');
+  const [name, setName]             = useState('');
+  const [email, setEmail]           = useState('');
+  const [password, setPassword]     = useState('');
+  const [confirm, setConfirm]       = useState('');
   const insets = useSafeAreaInsets();
 
-  const isValid = username.trim().length >= 3 && password.length >= 6;
+  const isLogin  = mode === 'login';
+  const isValid  = isLogin
+    ? email.trim().length >= 3 && password.length >= 6
+    : name.trim().length >= 2 && email.trim().length >= 3 && password.length >= 6 && confirm === password;
 
-  const heroAnim = useRef(new Animated.Value(0)).current;
-  const formAnim = useRef(new Animated.Value(0)).current;
-  const socialAnim = useRef(new Animated.Value(0)).current;
-  const phoneAnim = useRef(new Animated.Value(0)).current;
-  const userFocus = useRef(new Animated.Value(0)).current;
-  const passFocus = useRef(new Animated.Value(0)).current;
+  const contentAnim = useRef(new Animated.Value(0)).current;
+  const formAnim    = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.sequence([
-      Animated.timing(heroAnim, { toValue: 1, duration: 480, useNativeDriver: true }),
-      Animated.timing(formAnim, { toValue: 1, duration: 380, useNativeDriver: true }),
-      Animated.timing(socialAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
-      Animated.timing(phoneAnim, { toValue: 1, duration: 240, useNativeDriver: true }),
+    Animated.stagger(120, [
+      Animated.timing(contentAnim, { toValue: 1, duration: 420, useNativeDriver: true }),
+      Animated.timing(formAnim,    { toValue: 1, duration: 380, useNativeDriver: true }),
     ]).start();
   }, []);
 
-  const animateFocus = (anim: Animated.Value, focused: boolean) => {
-    Animated.timing(anim, {
-      toValue: focused ? 1 : 0,
-      duration: 180,
-      useNativeDriver: false,
-    }).start();
-  };
+  // Re-animate form when switching tabs
+  useEffect(() => {
+    formAnim.setValue(0);
+    Animated.timing(formAnim, { toValue: 1, duration: 260, useNativeDriver: true }).start();
+  }, [mode]);
 
-  const handleContinue = () => {
+  const handleSubmit = () => {
     if (!isValid) return;
-    // TODO: authenticate via username/password
     navigation.navigate('Welcome');
   };
-
-  const userBorder = userFocus.interpolate({
-    inputRange: [0, 1],
-    outputRange: [colors.border.default, colors.primary],
-  });
-  const passBorder = passFocus.interpolate({
-    inputRange: [0, 1],
-    outputRange: [colors.border.default, colors.primary],
-  });
 
   return (
     <KeyboardAvoidingView
@@ -80,167 +169,153 @@ export function LoginScreen({ navigation }: Props) {
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          { paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + spacing['2xl'] },
+          { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing['2xl'] },
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Back */}
-        <TouchableOpacity
-          style={styles.back}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="chevron-back" size={24} color={colors.text.secondary} />
-        </TouchableOpacity>
 
-        {/* Hero */}
+        {/* ── Brand header ─────────────────────────────────────────── */}
         <Animated.View
           style={[
-            styles.hero,
+            styles.brand,
             {
-              opacity: heroAnim,
-              transform: [
-                {
-                  translateY: heroAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [20, 0],
-                  }),
-                },
-              ],
+              opacity: contentAnim,
+              transform: [{ translateY: contentAnim.interpolate({ inputRange: [0,1], outputRange: [-8, 0] }) }],
             },
           ]}
         >
-          <Text style={styles.headline}>Welcome to{'\n'}Gymman</Text>
-          <Text style={styles.subhead}>Sign in or create a new account</Text>
+          <Ionicons name="flame" size={22} color={colors.primary} />
+          <Text style={styles.brandText}>GYMMAN</Text>
         </Animated.View>
 
-        {/* Username + password */}
+        {/* ── Title ────────────────────────────────────────────────── */}
+        <Animated.Text
+          style={[
+            styles.title,
+            {
+              opacity: contentAnim,
+              transform: [{ translateY: contentAnim.interpolate({ inputRange: [0,1], outputRange: [16, 0] }) }],
+            },
+          ]}
+        >
+          {isLogin ? 'LOGIN' : 'CREATE\nACCOUNT'}
+        </Animated.Text>
+
+        {/* ── Tab switcher ─────────────────────────────────────────── */}
+        <Animated.View
+          style={[
+            styles.tabs,
+            {
+              opacity: contentAnim,
+              transform: [{ translateY: contentAnim.interpolate({ inputRange: [0,1], outputRange: [8, 0] }) }],
+            },
+          ]}
+        >
+          <TouchableOpacity
+            style={[styles.tab, isLogin && styles.tabActive]}
+            onPress={() => setMode('login')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.tabText, isLogin ? styles.tabTextActive : styles.tabTextInactive]}>
+              LOGIN
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, !isLogin && styles.tabActive]}
+            onPress={() => setMode('signup')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.tabText, !isLogin ? styles.tabTextActive : styles.tabTextInactive]}>
+              SIGN UP
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* ── Form ─────────────────────────────────────────────────── */}
         <Animated.View
           style={[
             styles.form,
             {
               opacity: formAnim,
-              transform: [
-                {
-                  translateY: formAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [14, 0],
-                  }),
-                },
-              ],
+              transform: [{ translateY: formAnim.interpolate({ inputRange: [0,1], outputRange: [12, 0] }) }],
             },
           ]}
         >
-          <Animated.View style={[styles.inputWrapper, { borderColor: userBorder }]}>
-            <TextInput
-              style={styles.input}
-              value={username}
-              onChangeText={setUsername}
-              onFocus={() => animateFocus(userFocus, true)}
-              onBlur={() => animateFocus(userFocus, false)}
-              placeholder="Username or email"
-              placeholderTextColor={colors.text.disabled}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              returnKeyType="next"
-              selectionColor={colors.primary}
+          {!isLogin && (
+            <LabeledInput
+              label="NAME"
+              value={name}
+              onChangeText={setName}
+              placeholder="Your name"
             />
-          </Animated.View>
+          )}
 
-          <Animated.View style={[styles.inputWrapper, { borderColor: passBorder }]}>
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              value={password}
-              onChangeText={setPassword}
-              onFocus={() => animateFocus(passFocus, true)}
-              onBlur={() => animateFocus(passFocus, false)}
-              placeholder="Password"
-              placeholderTextColor={colors.text.disabled}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
+          <LabeledInput
+            label="EMAIL"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@example.com"
+            keyboardType="email-address"
+          />
+
+          <LabeledInput
+            label="PASSWORD"
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Min. 6 characters"
+            secureEntry
+            returnKeyType={isLogin ? 'done' : 'next'}
+            onSubmit={isLogin ? handleSubmit : undefined}
+          />
+
+          {!isLogin && (
+            <LabeledInput
+              label="CONFIRM PASSWORD"
+              value={confirm}
+              onChangeText={setConfirm}
+              placeholder="Repeat password"
+              secureEntry
               returnKeyType="done"
-              onSubmitEditing={handleContinue}
-              selectionColor={colors.primary}
+              onSubmit={handleSubmit}
             />
-            <TouchableOpacity
-              onPress={() => setShowPassword(p => !p)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons
-                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                size={20}
-                color={colors.text.muted}
-              />
-            </TouchableOpacity>
-          </Animated.View>
+          )}
 
+          {/* CTA button */}
           <TouchableOpacity
-            style={[styles.button, isValid ? styles.buttonActive : styles.buttonDisabled]}
-            onPress={handleContinue}
+            style={[styles.cta, !isValid && styles.ctaDisabled]}
+            onPress={handleSubmit}
             disabled={!isValid}
             activeOpacity={0.85}
           >
-            <Text style={[styles.buttonText, !isValid && styles.buttonTextDisabled]}>
-              Continue
+            <Text style={[styles.ctaText, !isValid && styles.ctaTextDisabled]}>
+              {isLogin ? 'LOGIN' : 'CREATE ACCOUNT'}
             </Text>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={isValid ? colors.text.inverse : colors.text.disabled}
+              style={{ marginLeft: 4 }}
+            />
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Social */}
-        <Animated.View style={[styles.social, { opacity: socialAnim }]}>
-          <Divider />
+        {/* ── Social ───────────────────────────────────────────────── */}
+        <View style={styles.social}>
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
 
-          <TouchableOpacity
-            style={styles.googleButton}
-            activeOpacity={0.8}
-            onPress={() => {
-              // TODO: trigger Google Sign-In
-            }}
-          >
+          <TouchableOpacity style={styles.googleBtn} activeOpacity={0.8}>
             <Ionicons name="logo-google" size={18} color={colors.text.primary} />
             <Text style={styles.googleText}>Continue with Google</Text>
           </TouchableOpacity>
-        </Animated.View>
+        </View>
 
-        {/* Phone option */}
-        <Animated.View style={[styles.phoneSection, { opacity: phoneAnim }]}>
-          <Divider faint />
-
-          <TouchableOpacity
-            style={styles.phoneButton}
-            activeOpacity={0.75}
-            onPress={() => {
-              // TODO: navigate to phone OTP flow
-            }}
-          >
-            <Ionicons name="call-outline" size={18} color={colors.text.secondary} />
-            <Text style={styles.phoneText}>Use phone number</Text>
-          </TouchableOpacity>
-
-          <View style={styles.accountabilityBox}>
-            <Text style={styles.accountabilityText}>
-              Choose your number and you can turn on gym accountability calls.
-              Miss the gym, skip logging — our guy will call and personally curse you out. 😤
-            </Text>
-          </View>
-        </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
-  );
-}
-
-// ─── Divider ─────────────────────────────────────────────────────────────────
-
-function Divider({ faint }: { faint?: boolean }) {
-  return (
-    <View style={styles.dividerRow}>
-      <View style={[styles.dividerLine, faint && styles.dividerLineFaint]} />
-      <Text style={[styles.dividerText, faint && styles.dividerTextFaint]}>or</Text>
-      <View style={[styles.dividerLine, faint && styles.dividerLineFaint]} />
-    </View>
   );
 }
 
@@ -255,75 +330,114 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenPadding,
   },
 
-  back: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -spacing.xs,
-  },
-
-  // Hero
-  hero: {
-    marginTop: spacing.xl,
-    gap: spacing.sm,
-    marginBottom: spacing['2xl'],
-  },
-  headline: {
-    ...typography.display,
-    color: colors.text.primary,
-  },
-  subhead: {
-    ...typography.subhead,
-    color: colors.text.muted,
-  },
-
-  // Form
-  form: {
-    gap: spacing.sm,
-  },
-  inputWrapper: {
+  // ── Brand ────────────────────────────────────────────────────────────────────
+  brand: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.xs + 2,
+    marginBottom: spacing.lg,
+  },
+  brandText: {
+    fontFamily: typography.fonts.display,
+    fontSize: 18,
+    color: colors.primary,
+    letterSpacing: 1,
+  },
+
+  // ── Title ────────────────────────────────────────────────────────────────────
+  title: {
+    fontFamily: typography.fonts.display,
+    fontSize: 52,
+    lineHeight: 54,
+    color: colors.text.primary,
+    letterSpacing: 1,
+    marginBottom: spacing.lg,
+    // Hard drop shadow for 3D letterpress effect
+    textShadowColor: 'rgba(0,0,0,0.9)',
+    textShadowOffset: { width: 3, height: 4 },
+    textShadowRadius: 0,
+  },
+
+  // ── Tabs ─────────────────────────────────────────────────────────────────────
+  tabs: {
+    flexDirection: 'row',
     backgroundColor: colors.bg.card,
     borderRadius: radius.input,
     borderWidth: 1,
-    height: spacing.inputHeight,
-    paddingHorizontal: spacing.md,
+    borderColor: colors.border.default,
+    padding: 3,
+    marginBottom: spacing.lg,
   },
-  input: {
+  tab: {
     flex: 1,
-    ...typography.body,
-    color: colors.text.primary,
-    padding: 0,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.input - 2,
   },
-  button: {
+  tabActive: {
+    backgroundColor: colors.primary,
+  },
+  tabText: {
+    fontFamily: typography.fonts.display,
+    fontSize: 13,
+    letterSpacing: 0.5,
+  },
+  tabTextActive: {
+    color: colors.text.inverse,
+  },
+  tabTextInactive: {
+    color: colors.text.muted,
+  },
+
+  // ── Form ─────────────────────────────────────────────────────────────────────
+  form: {
+    gap: spacing.md,
+  },
+
+  // ── CTA button ───────────────────────────────────────────────────────────────
+  cta: {
     height: spacing.buttonHeight,
+    backgroundColor: colors.primary,
     borderRadius: radius.button,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: spacing.xs,
   },
-  buttonActive: {
-    backgroundColor: colors.primary,
-  },
-  buttonDisabled: {
+  ctaDisabled: {
     backgroundColor: colors.bg.elevated,
   },
-  buttonText: {
-    ...typography.bodyMedium,
-    color: colors.text.primary,
+  ctaText: {
+    fontFamily: typography.fonts.display,
+    fontSize: 16,
+    letterSpacing: 1,
+    color: colors.text.inverse,
   },
-  buttonTextDisabled: {
+  ctaTextDisabled: {
     color: colors.text.disabled,
   },
 
-  // Social
+  // ── Social ───────────────────────────────────────────────────────────────────
   social: {
     marginTop: spacing.xl,
     gap: spacing.md,
   },
-  googleButton: {
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border.default,
+  },
+  dividerText: {
+    ...typography.footnote,
+    color: colors.text.muted,
+  },
+  googleBtn: {
     height: spacing.buttonHeight,
     borderRadius: radius.button,
     borderWidth: 1,
@@ -336,56 +450,5 @@ const styles = StyleSheet.create({
   googleText: {
     ...typography.bodyMedium,
     color: colors.text.primary,
-  },
-
-  // Phone
-  phoneSection: {
-    marginTop: spacing.xl,
-    gap: spacing.md,
-  },
-  phoneButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-  phoneText: {
-    ...typography.bodyMedium,
-    color: colors.text.secondary,
-  },
-  accountabilityBox: {
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-    padding: spacing.md,
-  },
-  accountabilityText: {
-    ...typography.footnote,
-    color: colors.text.muted,
-    lineHeight: 19,
-  },
-
-  // Divider
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.border.default,
-  },
-  dividerLineFaint: {
-    backgroundColor: colors.border.subtle,
-  },
-  dividerText: {
-    ...typography.footnote,
-    color: colors.text.muted,
-  },
-  dividerTextFaint: {
-    color: colors.text.disabled,
   },
 });
