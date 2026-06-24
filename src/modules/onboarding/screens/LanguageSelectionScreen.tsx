@@ -36,20 +36,20 @@ const LANGUAGES: LanguageOption[] = [
   {
     id: 'ml',
     name: 'മലയാളം',
-    descriptor: 'മലയാളത്തിൽ തുടരുക',
+    descriptor: 'Malayalam',
     isMalayalam: true,
   },
   {
     id: 'manglish',
     name: 'Manglish',
-    descriptor: 'Manglishil Thudaruka',
+    descriptor: 'Malayalam, typed in English',
   },
 ];
 
 const CONTINUE_TEXT: Record<Language, string> = {
-  en: 'Continue',
+  en: 'CONTINUE',
   ml: 'തുടരുക',
-  manglish: 'Thudaruka',
+  manglish: 'CONTINUE',
 };
 
 export function LanguageSelectionScreen({ navigation }: Props) {
@@ -57,83 +57,56 @@ export function LanguageSelectionScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
 
   const headerAnim = useRef(new Animated.Value(0)).current;
-  const cardAnims = useRef(LANGUAGES.map(() => new Animated.Value(0))).current;
+  const cardAnims  = useRef(LANGUAGES.map(() => new Animated.Value(0))).current;
   const buttonAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.sequence([
-      Animated.timing(headerAnim, {
-        toValue: 1,
-        duration: 550,
-        useNativeDriver: true,
-      }),
+      Animated.timing(headerAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
       Animated.stagger(
         90,
         cardAnims.map(anim =>
-          Animated.spring(anim, {
-            toValue: 1,
-            tension: 80,
-            friction: 10,
-            useNativeDriver: true,
-          })
+          Animated.spring(anim, { toValue: 1, tension: 80, friction: 10, useNativeDriver: true })
         )
       ),
-      Animated.timing(buttonAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
+      Animated.timing(buttonAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
     ]).start();
   }, []);
 
   const handleContinue = () => {
     if (!selected) return;
-    // TODO: persist language choice to store/language/ before navigating
     navigation.navigate('Login');
   };
 
-  const buttonText = selected ? CONTINUE_TEXT[selected] : 'Continue';
+  const buttonText = selected ? CONTINUE_TEXT[selected] : 'CONTINUE';
+  const isMlSelected = selected === 'ml';
 
   return (
     <View
       style={[
         styles.container,
-        {
-          paddingTop: insets.top + spacing.xl,
-          paddingBottom: insets.bottom + spacing.lg,
-        },
+        { paddingTop: insets.top + spacing.xl, paddingBottom: insets.bottom + spacing.lg },
       ]}
     >
       <StatusBar barStyle="light-content" backgroundColor={colors.bg.app} />
 
-      {/* Logo + tagline */}
+      {/* ── Header ─────────────────────────────────────────────────── */}
       <Animated.View
         style={[
           styles.header,
           {
             opacity: headerAnim,
-            transform: [
-              {
-                translateY: headerAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-16, 0],
-                }),
-              },
-            ],
+            transform: [{ translateY: headerAnim.interpolate({ inputRange: [0,1], outputRange: [-12, 0] }) }],
           },
         ]}
       >
-        <Text style={styles.logo}>GYMMAN</Text>
-        <View style={styles.taglines}>
-          <Text style={styles.tagline}>Choose your language</Text>
-          <Text style={[styles.tagline, styles.taglineMl]}>
-            ഭാഷ തിരഞ്ഞെടുക്കുക
-          </Text>
-          <Text style={styles.tagline}>Bhasha Thiranjedukkuka</Text>
-        </View>
+        <Text style={styles.title}>CHOOSE YOUR{'\n'}LANGUAGE</Text>
+        <Text style={styles.subtitle}>
+          Your coach will speak to you in this language. You can change it later.
+        </Text>
       </Animated.View>
 
-      {/* Language cards */}
+      {/* ── Language cards ─────────────────────────────────────────── */}
       <View style={styles.cards}>
         {LANGUAGES.map((lang, index) => (
           <LanguageCard
@@ -147,8 +120,8 @@ export function LanguageSelectionScreen({ navigation }: Props) {
         ))}
       </View>
 
-      {/* Continue */}
-      <Animated.View style={[styles.buttonWrap, { opacity: buttonAnim }]}>
+      {/* ── Continue button ─────────────────────────────────────────── */}
+      <Animated.View style={{ opacity: buttonAnim }}>
         <TouchableOpacity
           style={[styles.button, selected ? styles.buttonActive : styles.buttonDisabled]}
           onPress={handleContinue}
@@ -159,11 +132,17 @@ export function LanguageSelectionScreen({ navigation }: Props) {
             style={[
               styles.buttonText,
               !selected && styles.buttonTextDisabled,
-              selected === 'ml' && styles.buttonTextMl,
+              isMlSelected && styles.buttonTextMl,
             ]}
           >
             {buttonText}
           </Text>
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color={selected ? colors.text.inverse : colors.text.disabled}
+            style={{ marginLeft: 4 }}
+          />
         </TouchableOpacity>
       </Animated.View>
     </View>
@@ -182,50 +161,36 @@ interface CardProps {
 
 function LanguageCard({ option, selected, dimmed, entryAnim, onPress }: CardProps) {
   const pressScale = useRef(new Animated.Value(1)).current;
-  const dimAnim = useRef(new Animated.Value(1)).current;
+  const dimAnim    = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    Animated.timing(dimAnim, {
-      toValue: dimmed ? 0.4 : 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
+    Animated.timing(dimAnim, { toValue: dimmed ? 0.45 : 1, duration: 200, useNativeDriver: true }).start();
   }, [dimmed]);
 
-  // Pop feedback when this card becomes selected
   useEffect(() => {
     if (selected) {
       Animated.sequence([
-        Animated.timing(pressScale, { toValue: 1.03, duration: 90, useNativeDriver: true }),
+        Animated.timing(pressScale, { toValue: 1.02, duration: 80, useNativeDriver: true }),
         Animated.spring(pressScale, { toValue: 1, tension: 200, friction: 8, useNativeDriver: true }),
       ]).start();
     }
   }, [selected]);
 
-  const handlePressIn = () => {
+  const handlePressIn  = () =>
     Animated.spring(pressScale, { toValue: 0.97, tension: 200, friction: 10, useNativeDriver: true }).start();
-  };
-
-  const handlePressOut = () => {
+  const handlePressOut = () =>
     Animated.spring(pressScale, { toValue: 1, tension: 200, friction: 10, useNativeDriver: true }).start();
-  };
 
   return (
     <Animated.View
       style={{
         opacity: dimAnim,
         transform: [
-          {
-            translateY: entryAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [28, 0],
-            }),
-          },
-          {
-            scale: Animated.multiply(
-              entryAnim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }),
+          { translateY: entryAnim.interpolate({ inputRange: [0,1], outputRange: [28, 0] }) },
+          { scale: Animated.multiply(
+              entryAnim.interpolate({ inputRange: [0,1], outputRange: [0.95, 1] }),
               pressScale
-            ),
+            )
           },
         ],
       }}
@@ -256,11 +221,9 @@ function LanguageCard({ option, selected, dimmed, entryAnim, onPress }: CardProp
             {option.descriptor}
           </Text>
         </View>
-        <Ionicons
-          name={selected ? 'checkmark-circle' : 'ellipse-outline'}
-          size={24}
-          color={selected ? colors.primary : colors.border.strong}
-        />
+        {selected && (
+          <Ionicons name="checkmark" size={22} color={colors.primary} />
+        )}
       </TouchableOpacity>
     </Animated.View>
   );
@@ -278,30 +241,31 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
 
-  // Header
+  // ── Header ───────────────────────────────────────────────────────────────────
   header: {
     alignItems: 'center',
+    gap: spacing.md,
   },
-  logo: {
-    fontSize: typography.sizes['4xl'],
-    fontWeight: typography.weights.black,
-    color: colors.primary,
-    letterSpacing: 8,
+  title: {
+    fontFamily: typography.fonts.display,
+    fontSize: 36,
+    lineHeight: 40,
+    textAlign: 'center',
+    color: colors.text.primary,
+    letterSpacing: 1,
+    textShadowColor: 'rgba(0,0,0,0.9)',
+    textShadowOffset: { width: 3, height: 3 },
+    textShadowRadius: 0,
   },
-  taglines: {
-    alignItems: 'center',
-    marginTop: spacing.lg,
-    gap: spacing.xs,
-  },
-  tagline: {
-    ...typography.footnote,
+  subtitle: {
+    ...typography.callout,
     color: colors.text.muted,
-  },
-  taglineMl: {
-    fontFamily: ML_FONT,
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: spacing.sm,
   },
 
-  // Cards
+  // ── Cards ────────────────────────────────────────────────────────────────────
   cards: {
     gap: spacing.sm,
   },
@@ -317,7 +281,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardSelected: {
-    borderColor: colors.primaryBorder,
+    borderColor: colors.primary,
     backgroundColor: colors.primaryMuted,
   },
   cardContent: {
@@ -328,7 +292,7 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
   },
   cardNameSelected: {
-    color: colors.primaryLight,
+    color: colors.primary,
   },
   cardNameMl: {
     fontFamily: ML_FONT,
@@ -341,13 +305,11 @@ const styles = StyleSheet.create({
     fontFamily: ML_FONT,
   },
 
-  // Button
-  buttonWrap: {
-    width: '100%',
-  },
+  // ── Button ───────────────────────────────────────────────────────────────────
   button: {
     height: spacing.buttonHeight,
     borderRadius: radius.button,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -358,13 +320,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.elevated,
   },
   buttonText: {
-    ...typography.bodyMedium,
-    color: colors.text.primary,
+    fontFamily: typography.fonts.display,
+    fontSize: 16,
+    letterSpacing: 1,
+    color: colors.text.inverse,
   },
   buttonTextDisabled: {
     color: colors.text.disabled,
+    fontFamily: typography.fonts.display,
+    fontSize: 16,
+    letterSpacing: 1,
   },
   buttonTextMl: {
     fontFamily: ML_FONT,
+    fontSize: 16,
   },
 });

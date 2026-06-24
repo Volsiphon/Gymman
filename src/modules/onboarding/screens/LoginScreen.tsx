@@ -46,18 +46,13 @@ function LabeledInput({
   returnKeyType?: React.ComponentProps<typeof TextInput>['returnKeyType'];
   onSubmit?: () => void;
 }) {
-  const [focused, setFocused] = useState(false);
   const [visible, setVisible] = useState(false);
   const borderAnim = useRef(new Animated.Value(0)).current;
 
-  const handleFocus = () => {
-    setFocused(true);
+  const handleFocus = () =>
     Animated.timing(borderAnim, { toValue: 1, duration: 180, useNativeDriver: false }).start();
-  };
-  const handleBlur = () => {
-    setFocused(false);
+  const handleBlur = () =>
     Animated.timing(borderAnim, { toValue: 0, duration: 180, useNativeDriver: false }).start();
-  };
 
   const borderColor = borderAnim.interpolate({
     inputRange: [0, 1],
@@ -188,19 +183,6 @@ export function LoginScreen({ navigation }: Props) {
           <Ionicons name="flame" size={22} color={colors.primary} />
           <Text style={styles.brandText}>GYMMAN</Text>
         </Animated.View>
-
-        {/* ── Title ────────────────────────────────────────────────── */}
-        <Animated.Text
-          style={[
-            styles.title,
-            {
-              opacity: contentAnim,
-              transform: [{ translateY: contentAnim.interpolate({ inputRange: [0,1], outputRange: [16, 0] }) }],
-            },
-          ]}
-        >
-          {isLogin ? 'LOGIN' : 'CREATE\nACCOUNT'}
-        </Animated.Text>
 
         {/* ── Tab switcher ─────────────────────────────────────────── */}
         <Animated.View
