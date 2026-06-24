@@ -238,13 +238,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg.app,
     paddingHorizontal: spacing.screenPadding,
-    justifyContent: 'space-between',
   },
 
   // ── Header ───────────────────────────────────────────────────────────────────
   header: {
     alignItems: 'center',
     gap: spacing.md,
+    paddingBottom: spacing.xl,
   },
   title: {
     fontFamily: typography.fonts.display,
@@ -267,7 +267,9 @@ const styles = StyleSheet.create({
 
   // ── Cards ────────────────────────────────────────────────────────────────────
   cards: {
+    flex: 1,
     gap: spacing.sm,
+    justifyContent: 'center',
   },
   card: {
     backgroundColor: colors.bg.card,
