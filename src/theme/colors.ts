@@ -1,91 +1,84 @@
-// Internal palette — raw values, not exported.
-// Consumers use semantic names below, never these directly.
+// Internal palette — raw hex values, not exported.
 const p = {
-  black: '#000000',
-  n950: '#0A0A0B',
-  n900: '#111113',
-  n850: '#18181B',
-  n800: '#1C1C1F',
-  n700: '#27272A',
-  n600: '#3F3F46',
-  n500: '#52525B',
-  n400: '#71717A',
-  n300: '#A1A1AA',
-  n200: '#D4D4D8',
-  n100: '#F4F4F5',
+  // ── App surfaces ───────────────────────────────────────────────
+  bg:      '#14161A',
+  panel:   '#1E2128',
+  panel2:  '#262B33',
+  border:  '#2E333D',
+  border2: '#3A3F4A',
+
+  // ── Text ───────────────────────────────────────────────────────
+  text:      '#F2F0EB',
+  textMuted: '#8B8F99',
+  textFaint: '#6B7280',
+
+  // ── Brand ──────────────────────────────────────────────────────
+  accent: '#C8FF3D',
+
+  // ── Semantic ───────────────────────────────────────────────────
+  green:  '#22C55E',
+  coral:  '#FF5E5B',
+  blue:   '#64B5F6',
+  gold:   '#EAB308',
+  amber:  '#FCD34D',
+  orange: '#FB923C',
+
+  // ── Absolute ───────────────────────────────────────────────────
   white: '#FFFFFF',
-
-  red700: '#9F1025',
-  red600: '#C4162E',
-  red500: '#D91F3A',
-  red400: '#F43F5E',
-  red300: '#FB7185',
-
-  orange500: '#FB923C',
-  orange400: '#FDBA74',
-
-  amber400: '#FCD34D',
-
-  green500: '#22C55E',
-
-  cyan500: '#06B6D4',
-
-  gold500: '#EAB308',
+  black: '#000000',
 } as const;
 
 export const colors = {
   // ─── Backgrounds ───────────────────────────────────────────────
   bg: {
-    app: p.n950,       // root screen background
-    card: p.n900,      // cards, list items
-    elevated: p.n850,  // bottom sheets, modals
-    input: p.n800,     // text inputs
+    app:     p.bg,       // root screen background
+    card:    p.panel,    // cards, list items
+    elevated: p.panel2,  // bottom sheets, modals, nested panels
+    input:   p.panel2,   // text inputs
     overlay: 'rgba(0,0,0,0.75)',
   },
 
-  // ─── Brand ─────────────────────────────────────────────────────
-  primary: p.red500,
-  primaryLight: p.red400,
-  primaryDark: p.red700,
-  primaryMuted: 'rgba(217, 31, 58, 0.15)',
-  primaryBorder: 'rgba(217, 31, 58, 0.35)',
+  // ─── Brand / Accent ────────────────────────────────────────────
+  primary:       p.accent,
+  primaryLight:  '#D4FF62',
+  primaryDark:   '#A8D425',
+  primaryMuted:  'rgba(200,255,61,0.12)',
+  primaryBorder: 'rgba(200,255,61,0.30)',
 
   // ─── Semantic ──────────────────────────────────────────────────
-  success: p.green500,
-  successMuted: 'rgba(34, 197, 94, 0.15)',
+  success:      p.green,
+  successMuted: 'rgba(34,197,94,0.12)',
 
-  // Danger is brighter than primary red so errors read as alarms, not brand
-  danger: p.red400,
-  dangerMuted: 'rgba(244, 63, 94, 0.15)',
+  danger:      p.coral,
+  dangerMuted: 'rgba(255,94,91,0.12)',
 
-  info: p.cyan500,
-  infoMuted: 'rgba(6, 182, 212, 0.15)',
+  info:      p.blue,
+  infoMuted: 'rgba(100,181,246,0.12)',
 
-  gold: p.gold500,
-  goldMuted: 'rgba(234, 179, 8, 0.15)',
+  gold:      p.gold,
+  goldMuted: 'rgba(234,179,8,0.12)',
 
-  // ─── Streak Flames ─────────────────────────────────────────────
-  // 3-flame max lands on brand red — peak achievement = brand color
+  // ─── Streak flames ─────────────────────────────────────────────
   flame: {
-    one: p.amber400,
-    two: p.orange500,
-    three: p.red500,
+    one:   p.amber,
+    two:   p.orange,
+    three: p.accent,   // peak streak hits the brand accent
   },
 
   // ─── Text ──────────────────────────────────────────────────────
   text: {
-    primary: p.white,
-    secondary: p.n300,
-    muted: p.n400,
-    disabled: p.n600,
-    inverse: p.n950,
+    primary:   p.text,       // main readable text
+    secondary: p.textMuted,  // labels, captions
+    muted:     p.textFaint,  // hints, timestamps
+    disabled:  '#4A5060',
+    inverse:   p.bg,         // dark text on accent (lime) button
   },
 
   // ─── Borders ───────────────────────────────────────────────────
   border: {
-    default: p.n700,
-    subtle: p.n800,
-    strong: p.n600,
+    default: p.border,   // card borders, container outlines
+    subtle:  p.border2,  // hairline dividers within cards
+    strong:  '#4A5568',
   },
 
   transparent: 'transparent',

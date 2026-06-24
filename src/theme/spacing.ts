@@ -1,5 +1,4 @@
 // All spacing and sizing on a 4-point grid.
-// Components import named values — no magic numbers anywhere else.
 
 export const spacing = {
   // ─── Scale ─────────────────────────────────────────────────────
@@ -13,17 +12,17 @@ export const spacing = {
   '4xl': 80,
 
   // ─── Layout ────────────────────────────────────────────────────
-  screenPadding: 20,     // horizontal padding applied to every screen
-  screenPaddingTop: 16,  // top content gap below header
-  sectionGap: 32,        // vertical space between major page sections
-  cardPadding: 16,       // inner padding for Card component
+  screenPadding:    16,    // horizontal padding — matches PDF spec
+  screenPaddingTop: 16,
+  sectionGap:       28,
+  cardPadding:      16,
 
   // ─── Component dimensions ──────────────────────────────────────
-  buttonHeight: 52,
+  buttonHeight:   52,
   buttonHeightSm: 40,
-  inputHeight: 52,
-  tabBarHeight: 83,      // iOS with home indicator
-  headerHeight: 56,
+  inputHeight:    52,
+  tabBarHeight:   83,
+  headerHeight:   56,
 
   // ─── Avatars ───────────────────────────────────────────────────
   avatarSm: 32,
@@ -32,16 +31,16 @@ export const spacing = {
 };
 
 export const radius = {
-  sm: 6,
-  md: 10,
-  lg: 14,
-  xl: 20,
+  sm:  6,
+  md:  10,
+  lg:  14,
+  xl:  20,
   '2xl': 28,
 
-  card: 16,     // standard Card corner radius
-  button: 12,   // standard Button corner radius
-  input: 12,    // standard Input corner radius
-  badge: 6,
+  card:   16,     // cards, panels, bottom sheets
+  button: 12,     // buttons
+  input:   8,     // text inputs, tags — PDF spec
+  badge:   6,
 
-  full: 9999,   // pill shapes and circular avatars
+  full: 9999,     // pills, avatar circles
 };
