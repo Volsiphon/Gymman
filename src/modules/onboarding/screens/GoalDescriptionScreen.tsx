@@ -22,7 +22,8 @@ type Props = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'GoalDescription'>;
 };
 
-const MIN_WORDS = 15;
+const MIN_WORDS = 5;
+const MIN_CHARS = 15;
 
 export function GoalDescriptionScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
@@ -41,27 +42,18 @@ export function GoalDescriptionScreen({ navigation }: Props) {
   }, []);
 
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
-  const isValid = wordCount >= MIN_WORDS;
+  const isValid = wordCount >= MIN_WORDS || text.trim().length >= MIN_CHARS;
 
   return (
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + spacing.xs }]}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Ionicons name="chevron-back" size={24} color={colors.text.secondary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Your Goal</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: spacing.md }]}
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingTop: insets.top + spacing.lg, paddingBottom: spacing.md },
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -72,15 +64,13 @@ export function GoalDescriptionScreen({ navigation }: Props) {
             {
               opacity: heroAnim,
               transform: [{ translateY: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
+              overflow: 'visible',
             },
           ]}
         >
-          <Text style={styles.headline}>What are you working toward?</Text>
+          <Text style={styles.headline}>WHAT ARE YOU{'\n'}BUILDING TOWARD?</Text>
           <Text style={styles.body}>
-            Describe your goal in your own words — your timeline, your reasons, what success looks like, and anything standing in your way.
-          </Text>
-          <Text style={styles.nudge}>
-            The more you write, the better we can build a plan that actually works for you.
+            Be as specific as you can — physique references, timelines, how you want to feel. The more detail, the better your plan.
           </Text>
         </Animated.View>
 
@@ -100,7 +90,7 @@ export function GoalDescriptionScreen({ navigation }: Props) {
             value={text}
             onChangeText={setText}
             placeholder={
-              "E.g. I want to lose around 12 kg before my cousin's wedding in October. I've tried before but always quit after two weeks. This time I want to actually build a habit and not just crash diet. I'd love to feel confident without a shirt on..."
+              "e.g. I want a lean, athletic build — visible abs, broader shoulders. I've got about 6 months and I'm willing to train 5 days a week..."
             }
             placeholderTextColor={colors.text.disabled}
             multiline
@@ -116,9 +106,7 @@ export function GoalDescriptionScreen({ navigation }: Props) {
               {wordCount} {wordCount === 1 ? 'word' : 'words'}
             </Text>
             {!isValid && (
-              <Text style={styles.countHint}>
-                {MIN_WORDS - wordCount} more to continue
-              </Text>
+              <Text style={styles.countHint}>keep going...</Text>
             )}
             {isValid && (
               <View style={styles.checkBadge}>
@@ -138,8 +126,14 @@ export function GoalDescriptionScreen({ navigation }: Props) {
           activeOpacity={0.85}
         >
           <Text style={[styles.continueBtnText, !isValid && styles.continueBtnTextDisabled]}>
-            Continue
+            CONTINUE
           </Text>
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color={isValid ? colors.text.inverse : colors.text.disabled}
+            style={{ marginLeft: 4 }}
+          />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -154,43 +148,30 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.app,
   },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.screenPadding,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border.subtle,
-  },
-  headerTitle: {
-    ...typography.subhead,
-    color: colors.text.secondary,
-  },
-
   scroll: {
     paddingHorizontal: spacing.screenPadding,
   },
 
   // Hero
   hero: {
-    marginTop: spacing.xl,
     gap: spacing.md,
   },
   headline: {
-    ...typography.title1,
+    fontFamily: typography.fonts.display,
+    fontSize: 44,
+    lineHeight: 52,
+    paddingTop: 10,
     color: colors.text.primary,
+    letterSpacing: 0.5,
+    overflow: 'visible',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 3, height: 3 },
+    textShadowRadius: 0,
   },
   body: {
     ...typography.callout,
-    color: colors.text.secondary,
+    color: colors.text.muted,
     lineHeight: 23,
-  },
-  nudge: {
-    ...typography.callout,
-    color: colors.primary,
-    lineHeight: 23,
-    fontWeight: '500',
   },
 
   // Text area
@@ -207,7 +188,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border.default,
     padding: spacing.md,
     lineHeight: 24,
-    minHeight: 96,
+    minHeight: 180,
   },
 
   // Word count row
@@ -248,6 +229,7 @@ const styles = StyleSheet.create({
     height: spacing.buttonHeight,
     backgroundColor: colors.primary,
     borderRadius: radius.button,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -255,7 +237,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.elevated,
   },
   continueBtnText: {
-    ...typography.bodyMedium,
+    fontFamily: typography.fonts.display,
+    fontSize: 16,
+    letterSpacing: 1,
     color: colors.text.inverse,
   },
   continueBtnTextDisabled: {

@@ -51,18 +51,11 @@ export function WelcomeScreen({ navigation }: Props) {
           s.wordmark,
           {
             opacity: logoAnim,
-            transform: [
-              {
-                translateY: logoAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [8, 0],
-                }),
-              },
-            ],
+            transform: [{ translateY: logoAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
           },
         ]}
       >
-        <Ionicons name="sparkles" size={13} color={colors.text.disabled} />
+        <Ionicons name="flame" size={16} color={colors.primary} />
         <Text style={s.wordmarkText}>GYMMAN</Text>
       </Animated.View>
 
@@ -72,21 +65,13 @@ export function WelcomeScreen({ navigation }: Props) {
           s.headlineBlock,
           {
             opacity: headlineAnim,
-            transform: [
-              {
-                translateY: headlineAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [28, 0],
-                }),
-              },
-            ],
+            transform: [{ translateY: headlineAnim.interpolate({ inputRange: [0, 1], outputRange: [28, 0] }) }],
+            overflow: 'visible',
           },
         ]}
       >
-        <Text style={s.headline}>
-          <Text style={s.headlineWhite}>{'BUILT AROUND\nYOUR BODY.\n'}</Text>
-          <Text style={s.headlineRed}>{'NOT THE OTHER\nWAY AROUND.'}</Text>
-        </Text>
+        <Text style={s.headlineWhite}>{'BUILT AROUND\nYOUR BODY.'}</Text>
+        <Text style={s.headlineGreen}>{'NOT THE OTHER\nWAY AROUND.'}</Text>
       </Animated.View>
 
       {/* Description */}
@@ -106,8 +91,9 @@ export function WelcomeScreen({ navigation }: Props) {
           activeOpacity={0.85}
         >
           <Text style={s.ctaText}>START YOUR ASSESMENT</Text>
-          <Ionicons name="arrow-forward" size={18} color={colors.text.inverse} />
+          <Ionicons name="chevron-forward" size={20} color={colors.text.inverse} style={{ marginLeft: 4 }} />
         </TouchableOpacity>
+        <Text style={s.caption}>Free plan • No credit card</Text>
       </Animated.View>
     </View>
   );
@@ -123,30 +109,37 @@ const s = StyleSheet.create({
   wordmark: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: spacing.sm,
     marginTop: spacing.lg,
   },
   wordmarkText: {
-    ...typography.caption,
-    color: colors.text.disabled,
-    letterSpacing: 2.5,
-    fontWeight: '600',
+    fontFamily: typography.fonts.display,
+    fontSize: 15,
+    color: colors.primary,
+    letterSpacing: 2,
   },
 
   headlineBlock: {
     marginTop: spacing['2xl'],
-  },
-  headline: {
-    fontSize: 38,
-    fontWeight: '800',
-    lineHeight: 46,
-    letterSpacing: -0.5,
+    overflow: 'visible',
   },
   headlineWhite: {
+    fontFamily: typography.fonts.display,
+    fontSize: 52,
+    lineHeight: 58,
+    paddingTop: 10,
     color: colors.text.primary,
+    letterSpacing: 0.5,
+    overflow: 'visible',
   },
-  headlineRed: {
+  headlineGreen: {
+    fontFamily: typography.fonts.display,
+    fontSize: 52,
+    lineHeight: 58,
+    paddingTop: 10,
     color: colors.primary,
+    letterSpacing: 0.5,
+    overflow: 'visible',
   },
 
   descBlock: {
@@ -165,10 +158,17 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
   },
   ctaText: {
-    ...typography.bodyMedium,
+    fontFamily: typography.fonts.display,
+    fontSize: 16,
+    letterSpacing: 1,
     color: colors.text.inverse,
+  },
+  caption: {
+    ...typography.footnote,
+    color: colors.text.muted,
+    textAlign: 'center',
+    marginTop: spacing.sm,
   },
 });

@@ -420,10 +420,10 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
               {isRehab ? 'Back to onboarding' : 'Check my numbers'}
             </Text>
             <Ionicons
-              name="arrow-forward"
-              size={18}
+              name="chevron-forward"
+              size={20}
               color={colors.text.inverse}
-              style={{ marginLeft: 6 }}
+              style={{ marginLeft: 4 }}
             />
           </TouchableOpacity>
         </View>
@@ -705,7 +705,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   ctaBtnText: {
-    ...typography.bodyMedium,
+    fontFamily: typography.fonts.display,
+    fontSize: 16,
+    letterSpacing: 1,
     color: colors.text.inverse,
   },
 });

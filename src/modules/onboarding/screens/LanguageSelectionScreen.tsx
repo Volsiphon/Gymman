@@ -90,34 +90,40 @@ export function LanguageSelectionScreen({ navigation }: Props) {
     >
       <StatusBar barStyle="light-content" backgroundColor={colors.bg.app} />
 
-      {/* ── Header ─────────────────────────────────────────────────── */}
-      <Animated.View
-        style={[
-          styles.header,
-          {
-            opacity: headerAnim,
-            transform: [{ translateY: headerAnim.interpolate({ inputRange: [0,1], outputRange: [-12, 0] }) }],
-          },
-        ]}
-      >
-        <Text style={styles.title}>CHOOSE YOUR{'\n'}LANGUAGE</Text>
-        <Text style={styles.subtitle}>
-          Your coach will speak to you in this language. You can change it later.
-        </Text>
-      </Animated.View>
+      {/* ── Centered content block ─────────────────────────────────── */}
+      <View style={styles.centerGroup}>
 
-      {/* ── Language cards ─────────────────────────────────────────── */}
-      <View style={styles.cards}>
-        {LANGUAGES.map((lang, index) => (
-          <LanguageCard
-            key={lang.id}
-            option={lang}
-            selected={selected === lang.id}
-            dimmed={selected !== null && selected !== lang.id}
-            entryAnim={cardAnims[index]}
-            onPress={() => setSelected(lang.id)}
-          />
-        ))}
+        {/* ── Header ─────────────────────────────────────────────── */}
+        <Animated.View
+          style={[
+            styles.header,
+            {
+              opacity: headerAnim,
+              transform: [{ translateY: headerAnim.interpolate({ inputRange: [0,1], outputRange: [12, 0] }) }],
+              overflow: 'visible',
+            },
+          ]}
+        >
+          <Text style={styles.title}>CHOOSE YOUR{'\n'}LANGUAGE</Text>
+          <Text style={styles.subtitle}>
+            Your coach will speak to you in this language. You can change it later.
+          </Text>
+        </Animated.View>
+
+        {/* ── Language cards ─────────────────────────────────────── */}
+        <View style={styles.cards}>
+          {LANGUAGES.map((lang, index) => (
+            <LanguageCard
+              key={lang.id}
+              option={lang}
+              selected={selected === lang.id}
+              dimmed={selected !== null && selected !== lang.id}
+              entryAnim={cardAnims[index]}
+              onPress={() => setSelected(lang.id)}
+            />
+          ))}
+        </View>
+
       </View>
 
       {/* ── Continue button ─────────────────────────────────────────── */}
@@ -240,16 +246,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenPadding,
   },
 
+  // ── Centered group ───────────────────────────────────────────────────────────
+  centerGroup: {
+    flex: 1,
+    justifyContent: 'center',
+    overflow: 'visible',
+  },
+
   // ── Header ───────────────────────────────────────────────────────────────────
   header: {
     alignItems: 'center',
     gap: spacing.md,
-    paddingBottom: spacing.xl,
+    marginBottom: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.sm,
+    overflow: 'visible',
   },
   title: {
     fontFamily: typography.fonts.display,
     fontSize: 36,
-    lineHeight: 40,
+    lineHeight: 48,
     textAlign: 'center',
     color: colors.text.primary,
     letterSpacing: 1,
@@ -267,9 +283,8 @@ const styles = StyleSheet.create({
 
   // ── Cards ────────────────────────────────────────────────────────────────────
   cards: {
-    flex: 1,
     gap: spacing.sm,
-    justifyContent: 'center',
+    marginBottom: spacing.xl,
   },
   card: {
     backgroundColor: colors.bg.card,
