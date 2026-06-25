@@ -97,7 +97,7 @@ function getBotQuestion(q: QuestionKey): string {
     case 'weight':  return "What's your current weight? (e.g. 70 kg or 155 lbs)";
     case 'height':  return "What's your height? (e.g. 175 cm or 5'10\")";
     case 'neck':    return "Neck circumference? (e.g. 38 cm)\n\nWe know people don't generally know this, so you can skip it for now and add it in the app later when you have it.";
-    case 'waist':   return "And your waist? (e.g. 80 cm)\n\nWe know people don't generally know this, so you can skip it for now and add it in the app later when you have it.";
+    case 'waist':   return "And your waist? (e.g. 80 cm)\n\nWe know people don't generally know this either, so you can skip it for now and add it in the app later when you have it.";
     case 'hip':     return "And your hips? (e.g. 95 cm — or skip)";
     case 'country': return "Which country or region are you in? (city name works)";
     case 'dietary': return "Any dietary preferences? (vegan, halal, no restrictions, etc.)";

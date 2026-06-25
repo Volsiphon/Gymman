@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { PlanStackParamList } from '@/navigation/navigation/types';
-import { ChatView } from '@/shared/components/ChatView';
-import { trainerCoachChat } from '@/services/ai/trainerCoach';
+import { TrainerIntroView } from '@/shared/components/TrainerIntroView';
+import { loadUserName } from '@/services/storage/local/userStorage';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -48,6 +48,15 @@ type TabId = typeof TABS[number]['id'];
 export function TrainingScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [active, setActive] = useState<TabId>('trainer');
+  const [userName, setUserName] = useState<string>('');
+  const [nameLoaded, setNameLoaded] = useState(false);
+
+  useEffect(() => {
+    loadUserName().then((name) => {
+      setUserName(name ?? '');
+      setNameLoaded(true);
+    });
+  }, []);
 
   const current = TABS.find((t) => t.id === active)!;
 
@@ -85,12 +94,11 @@ export function TrainingScreen({ navigation }: Props) {
 
       {/* Content */}
       {active === 'trainer' ? (
-        <ChatView
-          onSend={trainerCoachChat}
-          accent={ACCENT}
-          welcomeMessage="Hey! I'm your personal trainer. Tell me about your equipment, experience level, or what you want to work on — I'll build something around you."
-          placeholder="Ask your trainer…"
-        />
+        nameLoaded ? (
+          <TrainerIntroView userName={userName} accent={ACCENT} />
+        ) : (
+          <View style={{ flex: 1 }} />
+        )
       ) : (
         <View style={s.content}>
           <View style={[s.contentIcon, { backgroundColor: ACCENT + '18' }]}>

@@ -13,6 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { OnboardingStackParamList } from '@/navigation/navigation';
 import { computeBodyStats } from '@/modules/onboarding/utils/fitnessCalculations';
+import { saveUserName } from '@/services/storage/local/userStorage';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -464,7 +465,8 @@ export function ExecutionPlanScreen({ navigation, route }: Props) {
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
         <TouchableOpacity
           style={styles.continueBtn}
-          onPress={() => {
+          onPress={async () => {
+            await saveUserName(stats.name);
             navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Main' as never }] });
           }}
           activeOpacity={0.85}

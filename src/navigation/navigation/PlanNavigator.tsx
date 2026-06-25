@@ -5,6 +5,7 @@ import {
   DietScreen,
   TrainingScreen,
   CaloryBurnScreen,
+  SevenDayScreen,
   PlaceholderDetailScreen,
 } from '@/modules/main';
 import type { PlanStackParamList } from './types';
@@ -25,6 +26,7 @@ export function PlanNavigator() {
       <Stack.Screen name="Diet"              component={DietScreen} />
       <Stack.Screen name="Training"          component={TrainingScreen} />
       <Stack.Screen name="CaloryBurn"        component={CaloryBurnScreen} />
+      <Stack.Screen name="SevenDay"          component={SevenDayScreen} />
       <Stack.Screen name="PlaceholderDetail" component={PlaceholderDetailScreen} />
     </Stack.Navigator>
   );

@@ -1,4 +1,5 @@
 export { PlanScreen } from './screens/PlanScreen';
+export { SevenDayScreen } from './screens/SevenDayView';
 export { DietScreen } from './screens/DietScreen';
 export { TrainingScreen } from './screens/TrainingScreen';
 export { CaloryBurnScreen } from './screens/CaloryBurnScreen';
