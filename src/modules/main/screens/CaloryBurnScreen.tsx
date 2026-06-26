@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { PlanStackParamList } from '@/navigation/navigation/types';
+import { CollapsibleTabBar } from '@/shared/components/CollapsibleTabBar';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -51,23 +52,12 @@ export function CaloryBurnScreen({ navigation }: Props) {
         <View style={{ width: 24 }} />
       </View>
 
-      {/* Tab nav */}
-      <View style={s.tabBar}>
-        {TABS.map((tab) => {
-          const on = tab.id === active;
-          return (
-            <TouchableOpacity
-              key={tab.id}
-              style={[s.tabBtn, on && { backgroundColor: ACCENT + '22', borderColor: ACCENT + '99' }]}
-              onPress={() => setActive(tab.id)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name={tab.icon as any} size={22} color={on ? ACCENT : colors.text.muted} />
-              <Text style={[s.tabLabel, on && { color: ACCENT }]}>{tab.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      <CollapsibleTabBar
+        tabs={TABS}
+        active={active}
+        onSelect={(id) => setActive(id as TabId)}
+        accent={ACCENT}
+      />
 
       {/* Placeholder content */}
       <View style={s.content}>
@@ -96,33 +86,6 @@ const s = StyleSheet.create({
   headerTitle: {
     ...typography.subhead,
     color: colors.text.secondary,
-  },
-
-  tabBar: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.screenPadding,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.bg.card,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border.subtle,
-  },
-  tabBtn: {
-    flex: 1,
-    height: 68,
-    borderRadius: 14,
-    backgroundColor: colors.bg.elevated,
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-  },
-  tabLabel: {
-    ...typography.caption,
-    color: colors.text.muted,
-    fontWeight: '500',
-    textAlign: 'center',
   },
 
   content: {

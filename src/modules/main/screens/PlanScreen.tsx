@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,11 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { PlanStackParamList } from '@/navigation/navigation/types';
+import { loadNutritionGoals, type NutritionGoals } from '@/services/storage/local/profileStorage';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -373,6 +375,7 @@ function TodayTargets({ targets }: { targets: Targets }) {
     { label: 'CARBS',   value: targets.carbs },
     { label: 'FATS',    value: targets.fats },
   ];
+  const hasGoalWeight = targets.goalWeight > 0;
   return (
     <View style={tt.card}>
       <Text style={tt.heading}>TODAY'S TARGETS</Text>
@@ -389,8 +392,14 @@ function TodayTargets({ targets }: { targets: Targets }) {
         <View style={tt.statBlock}>
           <Text style={tt.statLabel}>GOAL WEIGHT</Text>
           <View style={tt.statValueRow}>
-            <Text style={[tt.statNum, { color: colors.danger }]}>{targets.goalWeight}</Text>
-            <Text style={tt.unit}>kg</Text>
+            {hasGoalWeight ? (
+              <>
+                <Text style={[tt.statNum, { color: colors.danger }]}>{targets.goalWeight}</Text>
+                <Text style={tt.unit}>kg</Text>
+              </>
+            ) : (
+              <Text style={[tt.statNum, { color: colors.text.disabled, fontSize: 36 }]}>--</Text>
+            )}
           </View>
         </View>
       </View>
@@ -547,16 +556,17 @@ const cd = StyleSheet.create({
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-const PLACEHOLDER_TARGETS: Targets = {
-  calories:   2500,
-  goalWeight: 70,
-  protein:    170,
-  carbs:      250,
-  fats:       80,
-};
+const DEFAULT_GOALS: NutritionGoals = { calories: 1700, protein: 130, carbs: 170, fats: 47 };
 
 export function PlanScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const [goals, setGoals] = useState<NutritionGoals>(DEFAULT_GOALS);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadNutritionGoals().then(saved => { if (saved) setGoals(saved); });
+    }, []),
+  );
 
   const sections: SectionProps[] = [
     {
@@ -601,7 +611,13 @@ export function PlanScreen({ navigation }: Props) {
           fullStreak={0}
           weekDots={Array(7).fill(false)}
         />
-        <TodayTargets targets={PLACEHOLDER_TARGETS} />
+        <TodayTargets targets={{
+          calories:   goals.calories,
+          protein:    goals.protein,
+          carbs:      goals.carbs,
+          fats:       goals.fats,
+          goalWeight: goals.goalWeightKg ?? 0,
+        }} />
 
         {sections.map((sec) => (
           <SectionCard key={sec.title} {...sec} />

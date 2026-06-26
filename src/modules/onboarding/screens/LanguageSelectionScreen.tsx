@@ -150,6 +150,20 @@ export function LanguageSelectionScreen({ navigation }: Props) {
             style={{ marginLeft: 4 }}
           />
         </TouchableOpacity>
+
+        {/* ============================================================
+            DEVTIME — skip onboarding button for development only
+            DELETE THIS BLOCK before shipping
+            ============================================================ */}
+        <TouchableOpacity
+          style={styles.devSkipBtn}
+          onPress={() => (navigation as any).getParent()?.reset({ index: 0, routes: [{ name: 'Main' }] })}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.devSkipText}>⚡ DEV: Skip Onboarding</Text>
+        </TouchableOpacity>
+        {/* ============================================================ */}
+
       </Animated.View>
     </View>
   );
@@ -352,4 +366,23 @@ const styles = StyleSheet.create({
     fontFamily: ML_FONT,
     fontSize: 16,
   },
+
+  // ============================================================
+  // DEVTIME — delete with the button block above
+  // ============================================================
+  devSkipBtn: {
+    marginTop: spacing.sm,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderRadius: radius.button,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    borderStyle: 'dashed',
+  },
+  devSkipText: {
+    ...typography.callout,
+    color: colors.danger,
+    fontWeight: '600',
+  },
+  // ============================================================
 });

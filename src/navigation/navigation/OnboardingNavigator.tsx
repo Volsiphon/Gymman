@@ -15,7 +15,7 @@ export type OnboardingStackParamList = {
   PhotoCapture: { stats: UserPhysicalStats; goalText: string };
   GoalAnalysis: { stats: UserPhysicalStats; goalText: string; startOnAnalysis?: boolean };
   StatsReveal: { stats: UserPhysicalStats; goalText: string };
-  ExecutionPlan: { stats: UserPhysicalStats; goalText: string };
+  ExecutionPlan: { stats: UserPhysicalStats; goalText: string; targetWeightKg?: number };
 };
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();

@@ -14,6 +14,7 @@ import type { RouteProp } from '@react-navigation/native';
 import type { OnboardingStackParamList } from '@/navigation/navigation';
 import { computeBodyStats } from '@/modules/onboarding/utils/fitnessCalculations';
 import { saveUserName } from '@/services/storage/local/userStorage';
+import { saveNutritionGoals } from '@/services/storage/local/profileStorage';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -70,7 +71,7 @@ function classifyGoal(goalText: string, bfPercent: number, sex: string): GoalTyp
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export function ExecutionPlanScreen({ navigation, route }: Props) {
-  const { stats, goalText } = route.params;
+  const { stats, goalText, targetWeightKg } = route.params;
   const insets = useSafeAreaInsets();
   const calcs = computeBodyStats(stats);
 
@@ -466,7 +467,12 @@ export function ExecutionPlanScreen({ navigation, route }: Props) {
         <TouchableOpacity
           style={styles.continueBtn}
           onPress={async () => {
-            await saveUserName(stats.name);
+            const fatGrams  = Math.round(calorieTarget * 0.25 / 9);
+            const carbGrams = Math.round((calorieTarget - proteinGrams * 4 - fatGrams * 9) / 4);
+            await Promise.all([
+              saveUserName(stats.name),
+              saveNutritionGoals({ calories: calorieTarget, protein: proteinGrams, carbs: carbGrams, fats: fatGrams, goalWeightKg: targetWeightKg }),
+            ]);
             navigation.getParent()?.reset({ index: 0, routes: [{ name: 'Main' as never }] });
           }}
           activeOpacity={0.85}

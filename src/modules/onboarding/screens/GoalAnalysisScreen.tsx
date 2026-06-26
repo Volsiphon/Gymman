@@ -414,7 +414,7 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
           <TouchableOpacity
             style={styles.ctaBtn}
             activeOpacity={0.85}
-            onPress={() => navigation.navigate('ExecutionPlan', { stats, goalText })}
+            onPress={() => navigation.navigate('ExecutionPlan', { stats, goalText, targetWeightKg: journey?.targetWeightKg })}
           >
             <Text style={styles.ctaBtnText}>
               {isRehab ? 'Back to onboarding' : 'Check my numbers'}
