@@ -278,7 +278,7 @@ export function TrainingScreen({ navigation }: Props) {
 
         {active === 'today' && <TodayWorkoutView />}
 
-        {active === 'history' && <HistoryView />}
+        {active === 'history' && <HistoryView editable />}
       </View>
 
     </View>

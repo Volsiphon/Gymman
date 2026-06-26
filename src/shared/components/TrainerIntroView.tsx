@@ -113,23 +113,38 @@ export function TrainerIntroView({ userName, accent = colors.primary }: Props) {
     Array.from({ length: NUM_INTRO }, () => new Animated.Value(0)),
   ).current;
 
-  // On mount: load routines + history
+  // On mount: load routines + workout history + saved chats, restore last session
   useEffect(() => {
-    Promise.all([loadRoutines(), loadWorkoutLogs()]).then(([routines, logs]) => {
+    Promise.all([loadRoutines(), loadWorkoutLogs(), loadSavedChats()]).then(([routines, logs, saved]) => {
       setWorkoutLogs(logs);
       if (routines.length > 0) {
         setLoadedRoutines(routines);
         setRoutineMode(true);
         setChatPhase(true);
-        const greeting: DisplayMessage = {
-          id: 'coach-greeting',
-          role: 'assistant',
-          content: logs.length > 0
-            ? COACH_GREETING
-            : "Your routine is loaded. Ask me to swap exercises, adjust sets and reps, fix the split, or restructure your week. What needs work?",
-        };
-        chatMessagesRef.current = [greeting];
-        setChatMessages([greeting]);
+        if (saved.length > 0) {
+          const last = saved[0];
+          sessionIdRef.current = last.id;
+          chatMessagesRef.current = last.messages as DisplayMessage[];
+          setChatMessages([...chatMessagesRef.current]);
+          setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 120);
+        } else {
+          const greeting: DisplayMessage = {
+            id: 'coach-greeting',
+            role: 'assistant',
+            content: logs.length > 0
+              ? COACH_GREETING
+              : "Your routine is loaded. Ask me to swap exercises, adjust sets and reps, fix the split, or restructure your week. What needs work?",
+          };
+          chatMessagesRef.current = [greeting];
+          setChatMessages([greeting]);
+        }
+      } else if (saved.length > 0) {
+        const last = saved[0];
+        sessionIdRef.current = last.id;
+        chatMessagesRef.current = last.messages as DisplayMessage[];
+        setChatMessages([...chatMessagesRef.current]);
+        setChatPhase(true);
+        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: false }), 120);
       }
     });
   }, []);
@@ -178,6 +193,15 @@ export function TrainerIntroView({ userName, accent = colors.primary }: Props) {
     }
   }, [revealed]);
 
+  function persistCurrentChat() {
+    if (chatMessagesRef.current.length <= 1) return;
+    upsertSavedChat({
+      id: sessionIdRef.current,
+      startedAt: parseInt(sessionIdRef.current.replace('session-', ''), 10),
+      messages: chatMessagesRef.current,
+    });
+  }
+
   async function applyAndSavePatches(reply: string, summary: string) {
     const patches = extractPatches(reply);
     if (patches.length === 0) return;
@@ -200,6 +224,7 @@ export function TrainerIntroView({ userName, accent = colors.primary }: Props) {
       const sysMsg: DisplayMessage = { id: `sys-${now}`, role: 'system', content: summary };
       chatMessagesRef.current = [...chatMessagesRef.current, sysMsg];
       setChatMessages([...chatMessagesRef.current]);
+      persistCurrentChat();
     } catch (err) {
       console.error('[applyAndSavePatches]', err);
     }
@@ -243,6 +268,7 @@ export function TrainerIntroView({ userName, accent = colors.primary }: Props) {
         const aiMsg: DisplayMessage = { id: `a-${Date.now()}`, role: 'assistant', content: displayContent };
         chatMessagesRef.current = [...chatMessagesRef.current, aiMsg];
         setChatMessages([...chatMessagesRef.current]);
+        persistCurrentChat();
 
         if (hasPatchDone) {
           applyAndSavePatches(reply, summary);

@@ -6,10 +6,23 @@ import {
   ScrollView,
   ActivityIndicator,
   StyleSheet,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { loadWorkoutLogs } from '@/services/storage/local/workoutStorage';
-import { loadRoutineChanges } from '@/services/storage/local/historyStorage';
+import {
+  loadWorkoutLogs,
+  deleteWorkoutLog,
+  updateWorkoutLogFocus,
+} from '@/services/storage/local/workoutStorage';
+import {
+  loadRoutineChanges,
+  deleteRoutineChange,
+  updateRoutineChangeSummary,
+} from '@/services/storage/local/historyStorage';
 import type { WorkoutLog, RoutineChangeEvent, SetResult } from '@/types/workoutLog';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
@@ -18,6 +31,14 @@ import { spacing, radius } from '@/theme/spacing';
 type HistoryItem =
   | { type: 'workout'; data: WorkoutLog; timestamp: number }
   | { type: 'change'; data: RoutineChangeEvent; timestamp: number };
+
+type CaptchaAction = 'delete' | 'edit';
+
+const CAPTCHA_WORDS = ['FORGE', 'GRIND', 'PRESS', 'SQUAT', 'CRUSH', 'BLAZE', 'STORM', 'POWER'];
+
+function pickWord(): string {
+  return CAPTCHA_WORDS[Math.floor(Math.random() * CAPTCHA_WORDS.length)];
+}
 
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString('en-GB', {
@@ -31,7 +52,7 @@ function formatShortDate(ts: number): string {
   });
 }
 
-// ─── Mini set row (read-only, mirrors Today tab) ──────────────────────────────
+// ─── Mini set row (read-only) ─────────────────────────────────────────────────
 
 function MiniSetRow({ num, result, repsActual }: {
   num: number;
@@ -57,9 +78,164 @@ function MiniSetRow({ num, result, repsActual }: {
   );
 }
 
+// ─── Captcha Confirm Modal ────────────────────────────────────────────────────
+
+function CaptchaModal({
+  visible,
+  action,
+  word,
+  itemLabel,
+  onConfirm,
+  onCancel,
+}: {
+  visible: boolean;
+  action: CaptchaAction;
+  word: string;
+  itemLabel: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const [input, setInput] = useState('');
+
+  useEffect(() => {
+    if (visible) setInput('');
+  }, [visible]);
+
+  const matched = input === word;
+  const isDelete = action === 'delete';
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
+      <KeyboardAvoidingView
+        style={cap.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
+        <View style={cap.sheet}>
+          <View style={[cap.iconCircle, !isDelete && cap.iconCircleEdit]}>
+            <Ionicons
+              name={isDelete ? 'trash-outline' : 'pencil-outline'}
+              size={22}
+              color={isDelete ? colors.danger : colors.primary}
+            />
+          </View>
+
+          <Text style={cap.title}>{isDelete ? 'Delete entry?' : 'Edit entry?'}</Text>
+          <Text style={cap.label} numberOfLines={2}>{itemLabel}</Text>
+
+          <Text style={cap.hint}>Type this word to confirm:</Text>
+          <View style={cap.wordBox}>
+            <Text style={cap.word}>{word}</Text>
+          </View>
+
+          <TextInput
+            style={[cap.input, matched && cap.inputMatched]}
+            value={input}
+            onChangeText={(v) => setInput(v.toUpperCase())}
+            placeholder="Type here…"
+            placeholderTextColor={colors.text.disabled}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            returnKeyType="done"
+          />
+
+          <View style={cap.actions}>
+            <TouchableOpacity style={cap.cancelBtn} onPress={onCancel}>
+              <Text style={cap.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                cap.confirmBtn,
+                matched
+                  ? isDelete ? cap.confirmDelete : cap.confirmEdit
+                  : cap.confirmOff,
+              ]}
+              onPress={matched ? onConfirm : undefined}
+              activeOpacity={matched ? 0.7 : 1}
+            >
+              <Text style={[cap.confirmText, !matched && cap.confirmTextOff]}>
+                {isDelete ? 'Delete' : 'Continue'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+// ─── Edit Modal ───────────────────────────────────────────────────────────────
+
+function EditModal({
+  visible,
+  label,
+  initial,
+  onSave,
+  onCancel,
+}: {
+  visible: boolean;
+  label: string;
+  initial: string;
+  onSave: (v: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+
+  useEffect(() => {
+    if (visible) setValue(initial);
+  }, [visible, initial]);
+
+  const trimmed = value.trim();
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent>
+      <KeyboardAvoidingView
+        style={em.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} />
+        <View style={em.sheet}>
+          <View style={em.handle} />
+          <Text style={em.title}>Edit {label}</Text>
+          <TextInput
+            style={em.input}
+            value={value}
+            onChangeText={setValue}
+            multiline
+            autoFocus
+            placeholderTextColor={colors.text.disabled}
+          />
+          <View style={em.actions}>
+            <TouchableOpacity style={em.cancelBtn} onPress={onCancel}>
+              <Text style={em.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[em.saveBtn, !trimmed && em.saveOff]}
+              onPress={trimmed ? () => onSave(trimmed) : undefined}
+              activeOpacity={trimmed ? 0.7 : 1}
+            >
+              <Text style={[em.saveText, !trimmed && em.saveTextOff]}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 // ─── Workout history card ─────────────────────────────────────────────────────
 
-function WorkoutCard({ log }: { log: WorkoutLog }) {
+function WorkoutCard({
+  log,
+  editable,
+  onDelete,
+  onEdit,
+}: {
+  log: WorkoutLog;
+  editable: boolean;
+  onDelete: () => void;
+  onEdit: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
 
   const totalSets = log.exercises.reduce((n, ex) => n + ex.sets.length, 0);
@@ -71,7 +247,6 @@ function WorkoutCard({ log }: { log: WorkoutLog }) {
 
   return (
     <View style={wc.card}>
-      {/* Collapsed header */}
       <TouchableOpacity
         style={wc.header}
         onPress={() => setExpanded((v) => !v)}
@@ -97,7 +272,6 @@ function WorkoutCard({ log }: { log: WorkoutLog }) {
         />
       </TouchableOpacity>
 
-      {/* Expanded exercise breakdown */}
       {expanded && (
         <View style={wc.body}>
           <View style={wc.divider} />
@@ -106,7 +280,6 @@ function WorkoutCard({ log }: { log: WorkoutLog }) {
             const exAllDone = exDone === ex.sets.length;
             return (
               <View key={i} style={wc.exCard}>
-                {/* Exercise header */}
                 <View style={wc.exTop}>
                   <Text style={wc.exName} numberOfLines={1}>{ex.name}</Text>
                   <Text style={[wc.exBadge, !exAllDone && wc.exBadgeLow]}>
@@ -114,7 +287,6 @@ function WorkoutCard({ log }: { log: WorkoutLog }) {
                   </Text>
                 </View>
                 <Text style={wc.exTarget}>{ex.targetSets} sets · {ex.targetReps} reps</Text>
-                {/* Mini set rows */}
                 <View style={wc.setList}>
                   {ex.sets.map((set, j) => (
                     <MiniSetRow
@@ -128,15 +300,38 @@ function WorkoutCard({ log }: { log: WorkoutLog }) {
               </View>
             );
           })}
+
+          {editable && (
+            <View style={wc.mgmtRow}>
+              <TouchableOpacity style={wc.mgmtBtn} onPress={onEdit} activeOpacity={0.7}>
+                <Ionicons name="pencil-outline" size={14} color={colors.text.secondary} />
+                <Text style={wc.mgmtText}>Edit Focus</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[wc.mgmtBtn, wc.mgmtDanger]} onPress={onDelete} activeOpacity={0.7}>
+                <Ionicons name="trash-outline" size={14} color={colors.danger} />
+                <Text style={[wc.mgmtText, wc.mgmtDangerText]}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       )}
     </View>
   );
 }
 
-// ─── Golden routine change card ───────────────────────────────────────────────
+// ─── Routine change card ──────────────────────────────────────────────────────
 
-function ChangeCard({ event }: { event: RoutineChangeEvent }) {
+function ChangeCard({
+  event,
+  editable,
+  onDelete,
+  onEdit,
+}: {
+  event: RoutineChangeEvent;
+  editable: boolean;
+  onDelete: () => void;
+  onEdit: () => void;
+}) {
   return (
     <View style={cc.card}>
       <View style={cc.iconWrap}>
@@ -146,15 +341,36 @@ function ChangeCard({ event }: { event: RoutineChangeEvent }) {
         <Text style={cc.summary}>{event.summary}</Text>
         <Text style={cc.date}>{formatShortDate(event.changedAt)}</Text>
       </View>
+      {editable && (
+        <View style={cc.actions}>
+          <TouchableOpacity
+            onPress={onEdit}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="pencil-outline" size={15} color={colors.text.muted} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onDelete}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="trash-outline" size={15} color={colors.danger + 'CC'} />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function HistoryView() {
+export function HistoryView({ editable = false }: { editable?: boolean }) {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<HistoryItem[]>([]);
+  const [captchaVisible, setCaptchaVisible] = useState(false);
+  const [pendingItem, setPendingItem] = useState<HistoryItem | null>(null);
+  const [pendingAction, setPendingAction] = useState<CaptchaAction>('delete');
+  const [captchaWord, setCaptchaWord] = useState('');
+  const [editVisible, setEditVisible] = useState(false);
 
   useEffect(() => {
     Promise.all([loadWorkoutLogs(), loadRoutineChanges()]).then(([logs, changes]) => {
@@ -168,11 +384,66 @@ export function HistoryView() {
         data: c,
         timestamp: c.changedAt,
       }));
-      const merged = [...workoutItems, ...changeItems].sort((a, b) => b.timestamp - a.timestamp);
-      setItems(merged);
+      setItems([...workoutItems, ...changeItems].sort((a, b) => b.timestamp - a.timestamp));
       setLoading(false);
     });
   }, []);
+
+  function openCaptcha(item: HistoryItem, action: CaptchaAction) {
+    setCaptchaWord(pickWord());
+    setPendingItem(item);
+    setPendingAction(action);
+    setCaptchaVisible(true);
+  }
+
+  function dismissAll() {
+    setCaptchaVisible(false);
+    setEditVisible(false);
+    setPendingItem(null);
+  }
+
+  async function handleCaptchaConfirm() {
+    if (!pendingItem) return;
+    setCaptchaVisible(false);
+
+    if (pendingAction === 'delete') {
+      if (pendingItem.type === 'workout') {
+        await deleteWorkoutLog(pendingItem.data.id);
+      } else {
+        await deleteRoutineChange(pendingItem.data.id);
+      }
+      setItems((prev) => prev.filter((i) => i.data.id !== pendingItem.data.id));
+      setPendingItem(null);
+    } else {
+      setEditVisible(true);
+    }
+  }
+
+  async function handleEditSave(newValue: string) {
+    if (!pendingItem) return;
+
+    if (pendingItem.type === 'workout') {
+      await updateWorkoutLogFocus(pendingItem.data.id, newValue);
+      setItems((prev) =>
+        prev.map((i) =>
+          i.data.id === pendingItem.data.id && i.type === 'workout'
+            ? { ...i, data: { ...(i.data as WorkoutLog), focus: newValue } }
+            : i,
+        ),
+      );
+    } else {
+      await updateRoutineChangeSummary(pendingItem.data.id, newValue);
+      setItems((prev) =>
+        prev.map((i) =>
+          i.data.id === pendingItem.data.id && i.type === 'change'
+            ? { ...i, data: { ...(i.data as RoutineChangeEvent), summary: newValue } }
+            : i,
+        ),
+      );
+    }
+
+    dismissAll();
+  }
 
   if (loading) {
     return (
@@ -195,15 +466,62 @@ export function HistoryView() {
   }
 
   return (
-    <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
-      {items.map((item) =>
-        item.type === 'workout' ? (
-          <WorkoutCard key={item.data.id} log={item.data as WorkoutLog} />
-        ) : (
-          <ChangeCard key={item.data.id} event={item.data as RoutineChangeEvent} />
-        ),
-      )}
-    </ScrollView>
+    <>
+      <ScrollView contentContainerStyle={s.list} showsVerticalScrollIndicator={false}>
+        {items.map((item) =>
+          item.type === 'workout' ? (
+            <WorkoutCard
+              key={item.data.id}
+              log={item.data as WorkoutLog}
+              editable={editable}
+              onDelete={() => openCaptcha(item, 'delete')}
+              onEdit={() => openCaptcha(item, 'edit')}
+            />
+          ) : (
+            <ChangeCard
+              key={item.data.id}
+              event={item.data as RoutineChangeEvent}
+              editable={editable}
+              onDelete={() => openCaptcha(item, 'delete')}
+              onEdit={() => openCaptcha(item, 'edit')}
+            />
+          ),
+        )}
+      </ScrollView>
+
+      <CaptchaModal
+        visible={captchaVisible}
+        action={pendingAction}
+        word={captchaWord}
+        itemLabel={
+          pendingItem
+            ? pendingItem.type === 'workout'
+              ? `${(pendingItem.data as WorkoutLog).dayName} — ${(pendingItem.data as WorkoutLog).focus}`
+              : (pendingItem.data as RoutineChangeEvent).summary
+            : ''
+        }
+        onConfirm={handleCaptchaConfirm}
+        onCancel={dismissAll}
+      />
+
+      <EditModal
+        visible={editVisible}
+        label={
+          pendingItem
+            ? pendingItem.type === 'workout' ? 'Workout Focus' : 'Routine Note'
+            : ''
+        }
+        initial={
+          pendingItem
+            ? pendingItem.type === 'workout'
+              ? (pendingItem.data as WorkoutLog).focus
+              : (pendingItem.data as RoutineChangeEvent).summary
+            : ''
+        }
+        onSave={handleEditSave}
+        onCancel={dismissAll}
+      />
+    </>
   );
 }
 
@@ -252,6 +570,208 @@ const mr = StyleSheet.create({
   resultDone: { color: colors.success },
   resultShort: { color: '#EAB308', fontWeight: '600' },
   resultSkipped: { color: colors.text.muted },
+});
+
+// ─── Captcha modal styles ─────────────────────────────────────────────────────
+
+const cap = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: colors.bg.overlay,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.md,
+  },
+  sheet: {
+    backgroundColor: colors.bg.elevated,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  iconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.dangerMuted,
+    borderWidth: 1,
+    borderColor: colors.danger + '44',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
+  },
+  iconCircleEdit: {
+    backgroundColor: colors.primaryMuted,
+    borderColor: colors.primaryBorder,
+  },
+  title: {
+    ...typography.title3,
+    color: colors.text.primary,
+    textAlign: 'center',
+  },
+  label: {
+    ...typography.callout,
+    color: colors.text.muted,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  hint: {
+    ...typography.caption,
+    color: colors.text.muted,
+  },
+  wordBox: {
+    width: '100%',
+    backgroundColor: colors.bg.app,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  word: {
+    fontFamily: typography.fonts.display,
+    fontSize: 26,
+    letterSpacing: 6,
+    color: colors.text.primary,
+  },
+  input: {
+    width: '100%',
+    height: 48,
+    backgroundColor: colors.bg.input,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    textAlign: 'center',
+    fontSize: 18,
+    letterSpacing: 4,
+    color: colors.text.primary,
+  },
+  inputMatched: {
+    borderColor: colors.success + '88',
+    backgroundColor: colors.successMuted,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    width: '100%',
+    marginTop: spacing.xs,
+  },
+  cancelBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bg.card,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  cancelText: {
+    ...typography.callout,
+    color: colors.text.secondary,
+    fontWeight: '600',
+  },
+  confirmBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmDelete: { backgroundColor: colors.danger },
+  confirmEdit: { backgroundColor: colors.primary },
+  confirmOff: {
+    backgroundColor: colors.bg.card,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  confirmText: {
+    ...typography.callout,
+    fontWeight: '700',
+    color: colors.white,
+  },
+  confirmTextOff: { color: colors.text.disabled },
+});
+
+// ─── Edit modal styles ────────────────────────────────────────────────────────
+
+const em = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: colors.bg.overlay,
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: colors.bg.elevated,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+    gap: spacing.md,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border.default,
+    alignSelf: 'center',
+    marginBottom: spacing.xs,
+  },
+  title: {
+    ...typography.title3,
+    color: colors.text.primary,
+  },
+  input: {
+    backgroundColor: colors.bg.input,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    padding: spacing.md,
+    fontSize: 16,
+    color: colors.text.primary,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  cancelBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bg.card,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  cancelText: {
+    ...typography.callout,
+    color: colors.text.secondary,
+    fontWeight: '600',
+  },
+  saveBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+  },
+  saveOff: {
+    backgroundColor: colors.bg.card,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  saveText: {
+    ...typography.callout,
+    fontWeight: '700',
+    color: colors.text.inverse,
+  },
+  saveTextOff: { color: colors.text.disabled },
 });
 
 // ─── Workout card styles ──────────────────────────────────────────────────────
@@ -321,6 +841,36 @@ const wc = StyleSheet.create({
   exBadgeLow: { color: colors.danger, backgroundColor: colors.danger + '18' },
   exTarget: { ...typography.caption, color: colors.text.muted, marginBottom: spacing.xs },
   setList: { gap: 0 },
+
+  mgmtRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border.subtle,
+  },
+  mgmtBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: colors.bg.app,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  mgmtDanger: {
+    backgroundColor: colors.dangerMuted,
+    borderColor: colors.danger + '44',
+  },
+  mgmtText: {
+    ...typography.caption,
+    color: colors.text.secondary,
+    fontWeight: '600',
+  },
+  mgmtDangerText: { color: colors.danger },
 });
 
 // ─── Change card styles ───────────────────────────────────────────────────────
@@ -351,6 +901,11 @@ const cc = StyleSheet.create({
   content: { flex: 1, gap: 2 },
   summary: { ...typography.callout, color: colors.gold, fontWeight: '500' },
   date: { ...typography.caption, color: colors.gold + 'AA' },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
 });
 
 // ─── Screen-level styles ──────────────────────────────────────────────────────

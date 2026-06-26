@@ -23,3 +23,11 @@ export async function deleteWorkoutLog(id: string): Promise<void> {
   const list = await loadWorkoutLogs();
   await AsyncStorage.setItem(KEY, JSON.stringify(list.filter((l) => l.id !== id)));
 }
+
+export async function updateWorkoutLogFocus(id: string, focus: string): Promise<void> {
+  const list = await loadWorkoutLogs();
+  await AsyncStorage.setItem(
+    KEY,
+    JSON.stringify(list.map((l) => (l.id === id ? { ...l, focus } : l))),
+  );
+}

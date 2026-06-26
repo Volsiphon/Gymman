@@ -13,3 +13,16 @@ export async function saveRoutineChange(event: RoutineChangeEvent): Promise<void
   list.push(event);
   await AsyncStorage.setItem(KEY, JSON.stringify(list));
 }
+
+export async function deleteRoutineChange(id: string): Promise<void> {
+  const list = await loadRoutineChanges();
+  await AsyncStorage.setItem(KEY, JSON.stringify(list.filter((e) => e.id !== id)));
+}
+
+export async function updateRoutineChangeSummary(id: string, summary: string): Promise<void> {
+  const list = await loadRoutineChanges();
+  await AsyncStorage.setItem(
+    KEY,
+    JSON.stringify(list.map((e) => (e.id === id ? { ...e, summary } : e))),
+  );
+}
