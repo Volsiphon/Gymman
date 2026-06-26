@@ -16,6 +16,7 @@ export type PlanStackParamList = {
   Diet: undefined;
   Training: undefined;
   CaloryBurn: undefined;
+  Bloodwork: undefined;
   SevenDay: undefined;
   PlaceholderDetail: { title: string; description?: string };
 };

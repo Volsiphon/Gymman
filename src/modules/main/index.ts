@@ -3,6 +3,7 @@ export { SevenDayScreen } from './screens/SevenDayView';
 export { DietScreen } from './screens/DietScreen';
 export { TrainingScreen } from './screens/TrainingScreen';
 export { CaloryBurnScreen } from './screens/CaloryBurnScreen';
+export { BloodworkScreen } from './screens/BloodworkScreen';
 export { PlaceholderDetailScreen } from './screens/PlaceholderDetailScreen';
 export { ProgressScreen } from './screens/ProgressScreen';
 export { PhotosScreen } from './screens/PhotosScreen';

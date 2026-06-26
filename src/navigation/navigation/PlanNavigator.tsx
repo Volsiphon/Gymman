@@ -5,6 +5,7 @@ import {
   DietScreen,
   TrainingScreen,
   CaloryBurnScreen,
+  BloodworkScreen,
   SevenDayScreen,
   PlaceholderDetailScreen,
 } from '@/modules/main';
@@ -26,6 +27,7 @@ export function PlanNavigator() {
       <Stack.Screen name="Diet"              component={DietScreen} />
       <Stack.Screen name="Training"          component={TrainingScreen} />
       <Stack.Screen name="CaloryBurn"        component={CaloryBurnScreen} />
+      <Stack.Screen name="Bloodwork"         component={BloodworkScreen} />
       <Stack.Screen name="SevenDay"          component={SevenDayScreen} />
       <Stack.Screen name="PlaceholderDetail" component={PlaceholderDetailScreen} />
     </Stack.Navigator>
