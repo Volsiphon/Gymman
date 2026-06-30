@@ -7,4 +7,4 @@ export { GoalDescriptionScreen } from './screens/GoalDescriptionScreen';
 export { GoalAnalysisScreen } from './screens/GoalAnalysisScreen';
 export { StatsRevealScreen } from './screens/StatsRevealScreen';
 export { ExecutionPlanScreen } from './screens/ExecutionPlanScreen';
-export type { UserPhysicalStats } from './utils/physicalStatsParser';
+export type { UserPhysicalStats } from '@/types/user';

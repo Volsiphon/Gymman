@@ -1,9 +1,9 @@
 import { groqChat, type ChatMessage } from './client';
-import type { UserPhysicalStats, QuestionKey } from '@/modules/onboarding/utils/physicalStatsParser';
+import type { UserPhysicalStats, QuestionKey } from '@/types/user';
 import {
   extractName, extractAge, extractWeight, extractHeight,
   extractNeck, extractWaist, extractHip, estimateActivityLevel,
-} from '@/modules/onboarding/utils/physicalStatsParser';
+} from './physicalStatsParser';
 
 export type OnboardingAction = 'proceed' | 'skip' | 'off-topic' | 'unclear' | 'correction';
 

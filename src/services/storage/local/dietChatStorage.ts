@@ -1,22 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { StoredDietMessage, DietChat } from '@/types/coaching';
+
+// StoredDietMessage and DietChat are now defined in @/types/coaching — re-exported here for backwards compatibility.
+export type { StoredDietMessage, DietChat } from '@/types/coaching';
 
 const KEY      = '@gymman:dietChats';
 const MAX_CHATS = 50;
-
-export type StoredDietMessage = {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  actionCount?: number;
-  // imageUri intentionally omitted — temp URIs don't survive app restarts
-};
-
-export type DietChat = {
-  id: string;
-  title: string;
-  startedAt: number;
-  messages: StoredDietMessage[];
-};
 
 export async function loadDietChats(): Promise<DietChat[]> {
   const raw = await AsyncStorage.getItem(KEY);

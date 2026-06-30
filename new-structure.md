@@ -36,22 +36,22 @@ gymman/
 │   │   │   │   ├── LanguageSelectionScreen.tsx   ← First screen, renders static text
 │   │   │   │   ├── WelcomeScreen.tsx
 │   │   │   │   ├── LoginScreen.tsx
-│   │   │   │   ├── PhysicalStatsScreen.tsx
+│   │   │   │   ├── GoalDescriptionScreen.tsx     ← User types their goal in their own words
+│   │   │   │   ├── OnboardingChatScreen.tsx      ← AI chat that collects physical stats (replaces static form)
 │   │   │   │   ├── PhotoCaptureScreen.tsx        ← Optional step
-│   │   │   │   ├── GoalDescriptionScreen.tsx
-│   │   │   │   ├── GoalAnalysisScreen.tsx        ← AI analyses the goal live
+│   │   │   │   ├── GoalAnalysisScreen.tsx        ← AI analyses the goal live (3-phase)
 │   │   │   │   ├── StatsRevealScreen.tsx         ← Shows calculated BMR/TDEE/body fat
 │   │   │   │   └── ExecutionPlanScreen.tsx       ← Final screen: here is your plan
 │   │   │   ├── components/                       ← UI pieces only used in onboarding
 │   │   │   ├── utils/
-│   │   │   │   ├── fitnessCalculations.ts        ← BMR/TDEE helpers for the reveal screen
-│   │   │   │   └── physicalStatsParser.ts        ← Parses freeform stat text from AI
+│   │   │   │   └── fitnessCalculations.ts        ← BMR/TDEE helpers for the reveal screen
 │   │   │   └── index.ts
 │   │   │
 │   │   ├── plan/                ← The entire Plan tab and everything reachable from it
 │   │   │   │
 │   │   │   ├── home/            ← PlanScreen: the Plan tab's root/dashboard
 │   │   │   │   ├── PlanScreen.tsx
+│   │   │   │   ├── PlaceholderDetailScreen.tsx  ← "Being built" screen for unimplemented plan sub-screens
 │   │   │   │   └── components/
 │   │   │   │       ├── PlanHeader.tsx              ← GYMMAN brand + STREAK pill + 7-DAY pill
 │   │   │   │       ├── TodayTargets.tsx            ← Calories / Goal Weight / Macros card
@@ -133,10 +133,11 @@ gymman/
 │   │   │   ├── realism-check.ts     ← Is this timeline achievable?
 │   │   │   ├── path-calculator.ts   ← Weeks to goal at current deficit/surplus
 │   │   │   └── index.ts
-│   │   ├── calorie-engine/
+│   │   ├── nutrition/
 │   │   │   ├── maintenance-cal.ts   ← TDEE with/without logged activity
 │   │   │   ├── target-cal.ts        ← Calorie target from goal type + timeline
 │   │   │   ├── dynamic-adjustor.ts  ← Recalculate target when Dynamic Mode is on
+│   │   │   ├── macros.ts            ← Protein/fat/carb targets from calorie goal + LBM
 │   │   │   └── index.ts
 │   │   └── weekly-review/
 │   │       ├── data-analyzer.ts     ← Crunch a week of logs: surplus, trend, confidence
@@ -151,17 +152,19 @@ gymman/
 │   │   │   ├── nutritionCoach.ts      ← Diet AI: parses food, estimates macros, edits the log
 │   │   │   ├── trainerCoach.ts        ← Training AI: builds routines, coaches form
 │   │   │   ├── masterCoach.ts         ← Coach tab: full journey context, can modify targets
-│   │   │   ├── goalAnalyzer.ts        ← Onboarding: interprets goal text, realism check
-│   │   │   ├── onboardingCoach.ts     ← Onboarding conversation flow AI
-│   │   │   ├── statParser.ts          ← Parses stat data from AI responses during onboarding
-│   │   │   └── chatManager.ts         ← Session management: new chat, history, context limits
+│   │   │   ├── goalAnalysis.ts        ← Onboarding: 3-phase goal interpretation, realism check, prescription
+│   │   │   ├── executionPlan.ts       ← Onboarding: generates personalised training + diet execution content
+│   │   │   ├── onboardingChat.ts      ← Onboarding: structured questionnaire chat AI (stat collection)
+│   │   │   ├── onboardingCoach.ts     ← Onboarding: acknowledgment AI (warm replies after each answer)
+│   │   │   ├── statParser.ts          ← Onboarding: AI-based field parser (groqParseField)
+│   │   │   └── physicalStatsParser.ts ← Onboarding: regex fallback parsers used by onboardingChat when API is down
 │   │   │
 │   │   ├── storage/
 │   │   │   ├── local/           ← AsyncStorage wrappers, one file per data domain
 │   │   │   │   │
 │   │   │   │   │   USER
-│   │   │   │   ├── userStorage.ts          ← Name, basic profile
-│   │   │   │   ├── profileStorage.ts       ← Nutrition goals (calories, macros)
+│   │   │   │   ├── userProfileStorage.ts   ← Complete UserProfile: physical stats + computed values (BMR, TDEE, BF%, targets, macros)
+│   │   │   │   ├── profileStorage.ts       ← Nutrition goals (calories, macros) — quick-access targets used by diet screen
 │   │   │   │   ├── userBioStorage.ts       ← BMR, goal offset (computed during onboarding)
 │   │   │   │   │
 │   │   │   │   │   PLAN — DIET
@@ -286,12 +289,12 @@ The first-launch flow. Runs once, then never again. Completely sealed — nothin
 
 **Screens in order:**
 ```
-LanguageSelectionScreen → WelcomeScreen → LoginScreen → PhysicalStatsScreen
-→ PhotoCaptureScreen (optional) → GoalDescriptionScreen → GoalAnalysisScreen
-→ StatsRevealScreen → ExecutionPlanScreen
+LanguageSelectionScreen → WelcomeScreen → LoginScreen → GoalDescriptionScreen
+→ OnboardingChatScreen (AI chat collects physical stats) → PhotoCaptureScreen (optional)
+→ GoalAnalysisScreen → StatsRevealScreen → ExecutionPlanScreen
 ```
 
-`utils/physicalStatsParser.ts` and `utils/fitnessCalculations.ts` are onboarding-only helpers. They live inside this module (not in `shared/`) because nothing else uses them.
+`utils/fitnessCalculations.ts` is an onboarding-only helper (BMR/TDEE for the reveal screen). `physicalStatsParser.ts` moved to `services/ai/` because it's used as an offline fallback parser inside `onboardingChat.ts`.
 
 ---
 
@@ -354,10 +357,12 @@ Each AI file has a distinct job and distinct system prompt. They never overlap.
 | `nutritionCoach.ts` | `modules/plan/diet/` | Parses food, estimates macros, writes log actions, handles food photos |
 | `trainerCoach.ts` | `modules/plan/training/` | Builds routines, coaches form, handles progressive overload logic |
 | `masterCoach.ts` | `modules/coach/` | Full journey context, can propose changes to targets with user approval |
-| `goalAnalyzer.ts` | `modules/onboarding/` | Interprets goal text during onboarding, runs realism check |
-| `onboardingCoach.ts` | `modules/onboarding/` | Conversational AI for the onboarding flow |
-| `statParser.ts` | `modules/onboarding/` | Parses structured stat data returned by AI during onboarding |
-| `chatManager.ts` | any AI coach | Session management: new chat, load history, enforce context limits |
+| `goalAnalysis.ts` | `modules/onboarding/` | 3-phase goal analysis: interpretation, reality check, prescription |
+| `executionPlan.ts` | `modules/onboarding/` | Generates personalised training + diet execution content for the final onboarding screen |
+| `onboardingChat.ts` | `modules/onboarding/` | Structured questionnaire AI — collects physical stats one field at a time |
+| `onboardingCoach.ts` | `modules/onboarding/` | Acknowledgment AI — generates warm coach replies after each answer |
+| `statParser.ts` | `modules/onboarding/` | AI-based field parser (groqParseField) — used when precise structured parsing is needed |
+| `physicalStatsParser.ts` | `onboardingChat.ts` | Regex fallback parsers for when the API is down — extractName, extractAge, extractWeight, etc. |
 
 ---
 
@@ -422,9 +427,9 @@ App.tsx
     │   ├── LanguageSelectionScreen
     │   ├── WelcomeScreen
     │   ├── LoginScreen
-    │   ├── PhysicalStatsScreen
-    │   ├── PhotoCaptureScreen
     │   ├── GoalDescriptionScreen
+    │   ├── OnboardingChatScreen     ← AI chat that collects physical stats
+    │   ├── PhotoCaptureScreen
     │   ├── GoalAnalysisScreen
     │   ├── StatsRevealScreen
     │   └── ExecutionPlanScreen
@@ -466,7 +471,7 @@ App.tsx
 | The master AI Coach | `modules/coach/` |
 | The shop | `modules/shop/` |
 | Any body composition formula | `engine/body-metrics/` |
-| Any calorie calculation | `engine/calorie-engine/` |
+| Any calorie calculation | `engine/nutrition/` |
 | The 7-day recalibration math | `engine/weekly-review/` |
 | Nutrition AI system prompt or food logic | `services/ai/nutritionCoach.ts` |
 | Trainer AI system prompt | `services/ai/trainerCoach.ts` |

@@ -1,3 +1,15 @@
+export type OnboardingStackParamList = {
+  LanguageSelection: undefined;
+  Login: undefined;
+  Welcome: undefined;
+  GoalDescription: undefined;
+  OnboardingChat: { goalText: string };
+  PhotoCapture: undefined;
+  GoalAnalysis: undefined;
+  StatsReveal: undefined;
+  ExecutionPlan: undefined;
+};
+
 export type RootStackParamList = {
   Onboarding: undefined;
   Main: undefined;

@@ -5,7 +5,7 @@ export interface Exercise {
   sets: number;
   reps: string;
   rest?: string;
-  section?: string; // e.g. 'Warmup', 'Main Work', 'Cooldown'
+  section?: string;
 }
 
 export interface RoutineDay {
@@ -29,7 +29,7 @@ export type SetResult = 'done' | 'short' | 'skipped';
 
 export interface SetLog {
   result: SetResult;
-  repsActual?: number; // only populated for 'short'
+  repsActual?: number;
 }
 
 export interface ExerciseLog {
@@ -41,17 +41,43 @@ export interface ExerciseLog {
 
 export interface WorkoutLog {
   id: string;
-  date: string;         // "2026-06-25"
-  dayName: string;      // "Wednesday"
-  focus: string;        // "Back & Biceps"
+  date: string;
+  dayName: string;
+  focus: string;
   exercises: ExerciseLog[];
   completedAt: number;
 }
 
 export interface RoutineChangeEvent {
   id: string;
-  date: string;         // "2026-06-25"
-  summary: string;      // "First routine created — 4-day PPL split"
+  date: string;
+  summary: string;
   routineId: string;
   changedAt: number;
 }
+
+// ─── Calory burn ──────────────────────────────────────────────────────────────
+
+export type ActivityEntry = {
+  id: string;
+  name: string;
+  caloriesBurned: number;
+};
+
+export type DayActivities = {
+  date: string;
+  activities: ActivityEntry[];
+};
+
+// ─── Body weight progress ─────────────────────────────────────────────────────
+
+export type WeightLog = { date: string; kg: number };
+
+// ─── Transformation photos ────────────────────────────────────────────────────
+
+export type PhotoEntry = {
+  id: string;
+  uri: string;
+  date: string;      // YYYY-MM-DD
+  timestamp: number;
+};

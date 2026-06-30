@@ -1,43 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { ActivityLevel, Sex, UserPhysicalStats } from '@/modules/onboarding/utils/physicalStatsParser';
-import type { BodyGoalType } from '@/engine/goal-engine';
+import type { UserProfile, UserPhysicalStats } from '@/types/user';
+
+// UserProfile is now defined in @/types/user — re-exported here for backwards compatibility.
+export type { UserProfile } from '@/types/user';
 
 const KEY = 'gymman_user_profile';
-
-export type UserProfile = {
-  // ── Raw onboarding inputs (saved after PhysicalStats) ─────────────────────
-  name: string;
-  age: number;
-  sex: Sex;
-  weightKg: number;
-  heightCm: number;
-  neckCm?: number;
-  waistCm?: number;
-  hipCm?: number;
-  country: string;
-  dietary: string;
-  activityLevel: ActivityLevel;
-  activityDescription?: string;
-  goalText: string;
-
-  // ── Computed body composition (saved after GoalAnalysis) ───────────────────
-  bmr?: number;
-  tdee?: number;
-  bfPercent?: number;
-  fatMassKg?: number;
-  lbmKg?: number;
-
-  // ── Computed nutrition plan (saved after GoalAnalysis) ────────────────────
-  goalType?: BodyGoalType;
-  calorieTarget?: number;
-  proteinG?: number;
-  carbsG?: number;
-  fatsG?: number;
-  goalOffset?: number;        // calorieTarget − tdee
-  targetWeightKg?: number;
-  targetBFPercent?: number;
-  goalPathChoice?: 'a' | 'b'; // Option A = optimised, B = keep original inspiration
-};
 
 export function profileToStats(profile: UserProfile): UserPhysicalStats {
   return {

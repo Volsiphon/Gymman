@@ -62,7 +62,7 @@ The `plan/` module is the exception because it's a stack navigator with multiple
 | Onboarding flow | `modules/onboarding/screens/` |
 | Any body composition formula | `engine/body-metrics/` |
 | Weekly review math | `engine/weekly-review/` |
-| Calorie calculation logic | `engine/calorie-engine/` |
+| Calorie calculation logic | `engine/nutrition/` |
 | Nutrition AI system prompt | `services/ai/nutritionCoach.ts` |
 | Trainer AI system prompt | `services/ai/trainerCoach.ts` |
 | Master coach personality | `services/ai/masterCoach.ts` |

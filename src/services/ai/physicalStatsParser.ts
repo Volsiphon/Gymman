@@ -1,27 +1,4 @@
-export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'extreme';
-export type Sex = 'male' | 'female' | 'other';
-export type QuestionKey =
-  | 'name' | 'age' | 'sex' | 'weight' | 'height'
-  | 'neck' | 'waist' | 'hip'
-  | 'country' | 'dietary'
-  | 'activityLevel' | 'activityDescription';
-
-export interface UserPhysicalStats {
-  name: string;
-  age: number;
-  sex: Sex;
-  weightKg: number;
-  heightCm: number;
-  neckCm?: number;
-  waistCm?: number;
-  hipCm?: number;
-  country: string;
-  dietary: string;
-  activityLevel: ActivityLevel;
-}
-
-const titleCase = (s: string) =>
-  s.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+import type { ActivityLevel } from '@/types/user';
 
 export function extractName(raw: string): string | null {
   const t = raw.trim();
@@ -101,21 +78,6 @@ export function extractNeck(raw: string) { return extractCircumference(raw, 25, 
 export function extractWaist(raw: string) { return extractCircumference(raw, 50, 170); }
 export function extractHip(raw: string) { return extractCircumference(raw, 60, 180); }
 
-export function isGibberish(raw: string, q: QuestionKey): boolean {
-  const t = raw.trim();
-  if (!t) return true;
-  if (/^(.)\1{4,}/.test(t)) return true;
-  if (/^[^a-zA-Z0-9]+$/.test(t)) return true;
-  if (q === 'name') {
-    if (t.length < 2 || /^\d+$/.test(t)) return true;
-    if (t.length > 6 && !/[aeiou]/i.test(t)) return true;
-  }
-  if (q === 'age' && !/\d/.test(t)) return true;
-  if (['weight', 'height'].includes(q) && !/\d/.test(t)) return true;
-  if (['neck', 'waist', 'hip'].includes(q) && !/\d/.test(t) && !/\b(skip|no|nope|don.?t|idk|pass|n\/a)\b/i.test(t)) return true;
-  return false;
-}
-
 export function estimateActivityLevel(desc: string): ActivityLevel {
   const s = desc.toLowerCase();
   const scores: Record<ActivityLevel, number> = {
@@ -130,3 +92,6 @@ export function estimateActivityLevel(desc: string): ActivityLevel {
   if (!max) return 'moderate';
   return Object.entries(scores).find(([, v]) => v === max)![0] as ActivityLevel;
 }
+
+const titleCase = (s: string) =>
+  s.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');

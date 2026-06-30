@@ -23,9 +23,7 @@ import type { OnboardingStackParamList } from '@/app/navigation';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
-import {
-  type ActivityLevel, type Sex, type UserPhysicalStats, type QuestionKey,
-} from '../utils/physicalStatsParser';
+import type { ActivityLevel, Sex, UserPhysicalStats, QuestionKey } from '@/types/user';
 import { onboardingChat, type OnboardingChatResult } from '@/services/ai/onboardingChat';
 import type { ChatMessage } from '@/services/ai/client';
 import { saveUserProfile } from '@/services/storage/local/userProfileStorage';

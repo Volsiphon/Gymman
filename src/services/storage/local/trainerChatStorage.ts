@@ -1,19 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { SavedChatMessage, SavedChat } from '@/types/coaching';
+
+// SavedChatMessage and SavedChat are now defined in @/types/coaching — re-exported here for backwards compatibility.
+export type { SavedChatMessage, SavedChat } from '@/types/coaching';
 
 const KEY = '@gymman:trainerChats';
 const MAX_CHATS = 25;
-
-export interface SavedChatMessage {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-}
-
-export interface SavedChat {
-  id: string;
-  startedAt: number;
-  messages: SavedChatMessage[];
-}
 
 export async function loadSavedChats(): Promise<SavedChat[]> {
   const raw = await AsyncStorage.getItem(KEY);

@@ -1,13 +1,12 @@
 import { GROQ_API_KEY } from '@/config/keys';
+import type { ChatMessage } from '@/types/coaching';
+
+// ChatMessage is now defined in @/types/coaching — re-exported here for backwards compatibility.
+export type { ChatMessage } from '@/types/coaching';
 
 const BASE_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MODEL = 'llama-3.3-70b-versatile';
 const VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
-
-export type ChatMessage = {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-};
 
 export async function groqChat(messages: ChatMessage[]): Promise<string> {
   const res = await fetch(BASE_URL, {

@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { WeightLog } from '@/types/plan';
+
+// WeightLog is now defined in @/types/plan — re-exported here for backwards compatibility.
+export type { WeightLog } from '@/types/plan';
 
 const KEY = 'gymman_body_weight_logs';
-
-export type WeightLog = { date: string; kg: number };
 
 function todayKey(): string {
   const d = new Date();

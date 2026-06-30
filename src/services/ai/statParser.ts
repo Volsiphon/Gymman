@@ -1,5 +1,5 @@
 import { groqChat } from './client';
-import type { QuestionKey } from '@/modules/onboarding/utils/physicalStatsParser';
+import type { QuestionKey } from '@/types/user';
 
 export type FieldParseResult =
   | { kind: 'value'; value: number | string | WeightValue | HeightValue }

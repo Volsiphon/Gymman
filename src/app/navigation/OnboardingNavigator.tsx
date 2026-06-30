@@ -3,17 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { LanguageSelectionScreen, LoginScreen, WelcomeScreen, OnboardingChatScreen, PhotoCaptureScreen, GoalDescriptionScreen, GoalAnalysisScreen, StatsRevealScreen, ExecutionPlanScreen } from '@/modules/onboarding';
 import { colors } from '@/theme/colors';
 
-export type OnboardingStackParamList = {
-  LanguageSelection: undefined;
-  Login: undefined;
-  Welcome: undefined;
-  GoalDescription: undefined;
-  OnboardingChat: { goalText: string };
-  PhotoCapture: undefined;
-  GoalAnalysis: undefined;
-  StatsReveal: undefined;
-  ExecutionPlan: undefined;
-};
+import type { OnboardingStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();
 

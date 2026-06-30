@@ -1,18 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { ActivityEntry, DayActivities } from '@/types/plan';
+
+// ActivityEntry and DayActivities are now defined in @/types/plan — re-exported here for backwards compatibility.
+export type { ActivityEntry, DayActivities } from '@/types/plan';
 
 const KEY_DYNAMIC = 'gymman_calburn_dynamic';
 const KEY_ACTS    = 'gymman_calburn_acts';
-
-export type ActivityEntry = {
-  id: string;
-  name: string;
-  caloriesBurned: number;
-};
-
-export type DayActivities = {
-  date: string;
-  activities: ActivityEntry[];
-};
 
 function dateKey(d: Date): string {
   const y  = d.getFullYear();

@@ -1,14 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { NutritionGoals } from '@/types/user';
+
+// NutritionGoals is now defined in @/types/user — re-exported here for backwards compatibility.
+export type { NutritionGoals } from '@/types/user';
 
 const KEY = 'gymman_nutrition_goals';
-
-export type NutritionGoals = {
-  calories: number;
-  protein: number;
-  carbs: number;
-  fats: number;
-  goalWeightKg?: number;
-};
 
 export async function saveNutritionGoals(goals: NutritionGoals): Promise<void> {
   await AsyncStorage.setItem(KEY, JSON.stringify(goals));

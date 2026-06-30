@@ -1,13 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { PhotoEntry } from '@/types/plan';
+
+// PhotoEntry is now defined in @/types/plan — re-exported here for backwards compatibility.
+export type { PhotoEntry } from '@/types/plan';
 
 const KEY = 'gymman_progress_photos';
-
-export type PhotoEntry = {
-  id: string;
-  uri: string;
-  date: string;      // YYYY-MM-DD
-  timestamp: number;
-};
 
 async function loadMap(): Promise<Record<string, PhotoEntry>> {
   const raw = await AsyncStorage.getItem(KEY);

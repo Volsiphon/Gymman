@@ -1,5 +1,5 @@
 import { groqChat, type ChatMessage } from './client';
-import type { UserPhysicalStats, QuestionKey } from '@/modules/onboarding/utils/physicalStatsParser';
+import type { UserPhysicalStats, QuestionKey } from '@/types/user';
 
 const ACTIVITY_LABELS: Record<string, string> = {
   sedentary: 'Sedentary',
