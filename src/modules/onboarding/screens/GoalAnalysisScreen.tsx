@@ -1,249 +1,414 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   StyleSheet,
+  ScrollView,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RouteProp } from '@react-navigation/native';
-import type { OnboardingStackParamList } from '@/navigation/navigation';
-import { computeBodyStats } from '@/modules/onboarding/utils/fitnessCalculations';
-import type { BodyCompositionStats } from '@/modules/onboarding/utils/fitnessCalculations';
+import type { OnboardingStackParamList } from '@/app/navigation';
+import { computeBodyStats } from '@/engine/body-metrics';
+import { classifyGoal } from '@/engine/goal-engine';
+import { calcCalorieTarget, calcMacros } from '@/engine/nutrition';
 import {
-  analyzeGoal,
-  type GoalAnalysisResult,
-  type GoalJourney,
-} from '@/modules/onboarding/services/goalAnalysisService';
-import type { UserPhysicalStats } from '@/modules/onboarding/utils/physicalStatsParser';
+  loadUserProfile,
+  profileToStats,
+  saveUserProfile,
+} from '@/services/storage/local/userProfileStorage';
+import type { UserProfile } from '@/services/storage/local/userProfileStorage';
+import type { BodyCompositionStats } from '@/engine/body-metrics';
+import {
+  runPhase1,
+  runPhase2,
+  runPhase3,
+} from '@/services/ai/goalAnalysis';
+import type {
+  Phase1Result,
+  Phase2Result,
+  Phase3Result,
+  Phase3InfeasibleResult,
+} from '@/services/ai/goalAnalysis';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
 type Props = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'GoalAnalysis'>;
-  route: RouteProp<OnboardingStackParamList, 'GoalAnalysis'>;
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Card index constants ─────────────────────────────────────────────────────
 
-function Paragraphs({ text, style }: { text: string; style?: object }) {
-  const parts = text.split('\n\n').filter(Boolean);
+const CARD = {
+  WHAT_YOU_SAID:           0,
+  WHAT_WE_MEAN:            1,
+  WHY_WE_THINK:            2,
+  CURRENT_REALITY:         3,
+  ADVANTAGES:              4,
+  CHALLENGES:              5,
+  WHAT_MUST_CHANGE:        6,
+  TIMELINE:                7,
+  SCIENTIFIC_TRANSLATION:  8,
+  REALITY_ASSESSMENT:      9,
+  OPTIMISED_GOAL:          10,
+  FIRST_MILESTONE:         11,
+  LONG_TERM_VISION:        12,
+} as const;
+
+const TOTAL_CARDS = 13;
+
+// Phase 2 fires when card 0 is shown; Phase 3 fires when card 3 is shown
+const PHASE2_TRIGGER = CARD.WHAT_YOU_SAID;
+const PHASE3_TRIGGER = CARD.CURRENT_REALITY;
+
+// ─── Card header config ───────────────────────────────────────────────────────
+
+const CARD_META: Record<number, { label: string; icon: string; iconColor: string }> = {
+  [CARD.WHAT_YOU_SAID]:          { label: 'WHAT YOU SAID',             icon: 'chatbubble-outline',       iconColor: colors.text.muted },
+  [CARD.WHAT_WE_MEAN]:           { label: 'WHAT WE BELIEVE YOU MEAN',  icon: 'bulb-outline',             iconColor: colors.gold },
+  [CARD.WHY_WE_THINK]:           { label: 'WHY WE THINK THAT',         icon: 'telescope-outline',         iconColor: colors.info },
+  [CARD.CURRENT_REALITY]:        { label: 'YOUR CURRENT REALITY',       icon: 'body-outline',             iconColor: colors.primaryLight },
+  [CARD.ADVANTAGES]:             { label: 'YOUR BIGGEST ADVANTAGES',    icon: 'trending-up-outline',      iconColor: colors.success },
+  [CARD.CHALLENGES]:             { label: 'YOUR BIGGEST CHALLENGES',    icon: 'warning-outline',          iconColor: colors.gold },
+  [CARD.WHAT_MUST_CHANGE]:       { label: 'WHAT MUST CHANGE',          icon: 'swap-horizontal-outline',  iconColor: colors.primary },
+  [CARD.TIMELINE]:               { label: 'ESTIMATED TIMELINE',         icon: 'time-outline',             iconColor: colors.info },
+  [CARD.SCIENTIFIC_TRANSLATION]: { label: 'SCIENTIFIC TRANSLATION',     icon: 'flask-outline',            iconColor: colors.primaryLight },
+  [CARD.REALITY_ASSESSMENT]:     { label: 'REALITY ASSESSMENT',         icon: 'checkmark-circle-outline', iconColor: colors.success },
+  [CARD.OPTIMISED_GOAL]:         { label: 'YOUR OPTIMISED GOAL',        icon: 'flag-outline',             iconColor: colors.primary },
+  [CARD.FIRST_MILESTONE]:        { label: 'FIRST MILESTONE',            icon: 'ribbon-outline',           iconColor: colors.gold },
+  [CARD.LONG_TERM_VISION]:       { label: 'LONG-TERM VISION',           icon: 'eye-outline',              iconColor: colors.info },
+};
+
+// ─── Card component ───────────────────────────────────────────────────────────
+
+function CardShell({
+  cardIndex,
+  children,
+  anim,
+}: {
+  cardIndex: number;
+  children: React.ReactNode;
+  anim: Animated.Value;
+}) {
+  const meta = CARD_META[cardIndex];
+  return (
+    <Animated.View
+      style={[
+        styles.card,
+        {
+          opacity: anim,
+          transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+        },
+      ]}
+    >
+      <View style={styles.cardHeader}>
+        <View style={[styles.cardIconWrap, { backgroundColor: meta.iconColor + '20' }]}>
+          <Ionicons name={meta.icon as any} size={16} color={meta.iconColor} />
+        </View>
+        <Text style={styles.cardLabel}>{meta.label}</Text>
+      </View>
+      <View style={styles.cardDivider} />
+      <View style={styles.cardBody}>{children}</View>
+    </Animated.View>
+  );
+}
+
+function CardText({ text }: { text: string }) {
   return (
     <>
-      {parts.map((p, i) => (
-        <Text key={i} style={[styles.bodyText, style, i > 0 && { marginTop: spacing.sm }]}>
-          {p}
-        </Text>
+      {text.split('\n\n').filter(Boolean).map((p, i) => (
+        <Text key={i} style={[styles.cardBodyText, i > 0 && { marginTop: spacing.sm }]}>{p}</Text>
       ))}
     </>
   );
 }
 
-// ─── Section card ─────────────────────────────────────────────────────────────
+// ─── Option A/B selector ──────────────────────────────────────────────────────
 
-function SectionCard({
-  icon,
-  iconColor,
-  label,
+function OptionCard({
+  letter,
   title,
-  children,
-  accent,
+  description,
+  selected,
+  onSelect,
 }: {
-  icon: string;
-  iconColor: string;
-  label: string;
+  letter: 'A' | 'B';
   title: string;
-  children: React.ReactNode;
-  accent?: boolean;
+  description: string;
+  selected: boolean;
+  onSelect: () => void;
 }) {
+  const accentColor = letter === 'A' ? colors.primary : colors.gold;
   return (
-    <View style={[styles.card, accent && styles.cardAccent]}>
-      <View style={styles.cardHeader}>
-        <View style={[styles.iconWrap, { backgroundColor: iconColor + '22' }]}>
-          <Ionicons name={icon as any} size={18} color={iconColor} />
+    <TouchableOpacity
+      style={[styles.optionCard, selected && { borderColor: accentColor, backgroundColor: accentColor + '12' }]}
+      onPress={onSelect}
+      activeOpacity={0.8}
+    >
+      <View style={styles.optionHeader}>
+        <View style={[styles.optionBadge, { backgroundColor: accentColor + '22' }]}>
+          <Text style={[styles.optionBadgeText, { color: accentColor }]}>OPTION {letter}</Text>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardLabel}>{label}</Text>
-          <Text style={styles.cardTitle}>{title}</Text>
-        </View>
+        {selected && <Ionicons name="checkmark-circle" size={18} color={accentColor} />}
       </View>
-      <View style={styles.cardDivider} />
-      <View>{children}</View>
-    </View>
+      <Text style={styles.optionTitle}>{title}</Text>
+      <Text style={styles.optionDesc}>{description}</Text>
+    </TouchableOpacity>
   );
 }
 
-// ─── Verdict card (Section 1) ─────────────────────────────────────────────────
+// ─── Loading placeholder ──────────────────────────────────────────────────────
 
-function VerdictCard({
-  verdict,
-  isFeasible,
-  journey,
-}: {
-  verdict: string;
-  isFeasible?: boolean;
-  journey?: GoalJourney;
-}) {
-  const feasible = isFeasible !== false;
-  const accentColor = feasible ? colors.success : colors.gold;
-  const badgeIcon = feasible ? 'checkmark-circle-outline' : 'alert-circle-outline';
-  const badgeLabel = feasible ? 'ACHIEVABLE' : "LET'S REDIRECT";
-
+function CardLoading({ cardIndex }: { cardIndex: number }) {
+  const meta = CARD_META[cardIndex];
   return (
-    <View style={[styles.card, { borderColor: accentColor + '55' }]}>
+    <View style={[styles.card, styles.cardLoading]}>
       <View style={styles.cardHeader}>
-        <View style={[styles.iconWrap, { backgroundColor: accentColor + '22' }]}>
-          <Ionicons name={badgeIcon as any} size={18} color={accentColor} />
+        <View style={[styles.cardIconWrap, { backgroundColor: meta.iconColor + '20' }]}>
+          <Ionicons name={meta.icon as any} size={16} color={meta.iconColor} />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardLabel}>FEASIBILITY CHECK</Text>
-          <Text style={[styles.cardTitle, { color: accentColor }]}>{badgeLabel}</Text>
-        </View>
+        <Text style={styles.cardLabel}>{meta.label}</Text>
       </View>
       <View style={styles.cardDivider} />
-      <Text style={styles.bodyText}>{verdict}</Text>
-      {journey && feasible && (
-        <>
-          <View style={[styles.cardDivider, { marginTop: spacing.md }]} />
-          <View style={styles.verdictMeta}>
-            <Ionicons name="time-outline" size={14} color={colors.gold} />
-            <Text style={styles.verdictMetaText}>
-              Timeline:{' '}
-              <Text style={{ color: colors.gold, fontWeight: '600' }}>{journey.timelineText}</Text>
-            </Text>
-          </View>
-        </>
-      )}
-    </View>
-  );
-}
-
-// ─── Journey card ─────────────────────────────────────────────────────────────
-
-function JourneyCard({
-  stats,
-  calcs,
-  journey,
-}: {
-  stats: UserPhysicalStats;
-  calcs: BodyCompositionStats;
-  journey: GoalJourney;
-}) {
-  const targetFatKg =
-    Math.round((journey.targetWeightKg * journey.targetBFPercent) / 100 * 10) / 10;
-  const targetLeanKg =
-    Math.round((journey.targetWeightKg - targetFatKg) * 10) / 10;
-
-  const rows: { label: string; now: string; target: string }[] = [
-    {
-      label: 'Body Weight',
-      now: `${stats.weightKg} kg`,
-      target: `${journey.targetWeightKg} kg`,
-    },
-    {
-      label: 'Body Fat',
-      now: `${calcs.bfPercent}%`,
-      target: `${journey.targetBFPercent}%`,
-    },
-    {
-      label: 'Fat Mass',
-      now: `${calcs.fatMassKg} kg`,
-      target: `${targetFatKg} kg`,
-    },
-    {
-      label: 'Lean Mass',
-      now: `${calcs.lbmKg} kg`,
-      target: `${targetLeanKg} kg`,
-    },
-  ];
-
-  return (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={[styles.iconWrap, { backgroundColor: colors.success + '22' }]}>
-          <Ionicons name="trending-up-outline" size={18} color={colors.success} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardLabel}>YOUR JOURNEY</Text>
-          <Text style={styles.cardTitle}>Now and Target</Text>
-        </View>
-      </View>
-      <View style={styles.cardDivider} />
-
-      {/* Column headers */}
-      <View style={styles.journeyRow}>
-        <Text style={[styles.journeyCell, { flex: 2 }]} />
-        <Text style={[styles.journeyColHead, { flex: 2, textAlign: 'right' }]}>NOW</Text>
-        <View style={{ width: 28 }} />
-        <Text style={[styles.journeyColHead, { flex: 2, textAlign: 'left', color: colors.success }]}>
-          TARGET
-        </Text>
-      </View>
-
-      {rows.map((row, i) => (
-        <View key={i} style={[styles.journeyRow, i > 0 && styles.journeyRowBorder]}>
-          <Text style={[styles.journeyRowLabel, { flex: 2 }]}>{row.label}</Text>
-          <Text style={[styles.journeyNow, { flex: 2, textAlign: 'right' }]}>{row.now}</Text>
-          <View style={{ width: 28, alignItems: 'center' }}>
-            <Ionicons name="arrow-forward" size={12} color={colors.text.muted} />
-          </View>
-          <Text style={[styles.journeyTarget, { flex: 2, textAlign: 'left' }]}>{row.target}</Text>
-        </View>
-      ))}
-
-      <View style={[styles.cardDivider, { marginTop: spacing.md }]} />
-
-      <View style={styles.journeyMeta}>
-        <Ionicons name="flash-outline" size={14} color={colors.info} />
-        <Text style={styles.journeyMetaText}>{journey.earlyWins}</Text>
+      <View style={styles.cardLoadingBody}>
+        <ActivityIndicator size="small" color={colors.primary} />
+        <Text style={styles.cardLoadingText}>Analysing…</Text>
       </View>
     </View>
   );
 }
 
-// ─── Main screen ──────────────────────────────────────────────────────────────
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
-export function GoalAnalysisScreen({ navigation, route }: Props) {
-  const { stats, goalText } = route.params;
+export function GoalAnalysisScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const calcs = computeBodyStats(stats);
 
-  const [result, setResult] = useState<GoalAnalysisResult | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [profile, setProfile]   = useState<UserProfile | null>(null);
+  const [calcs, setCalcs]       = useState<BodyCompositionStats | null>(null);
+  const [cardIndex, setCardIndex] = useState(0);
+  const [pathChoice, setPathChoice] = useState<'a' | 'b' | null>(null);
+
+  const [p1, setP1] = useState<Phase1Result | null>(null);
+  const [p2, setP2] = useState<Phase2Result | null>(null);
+  const [p3, setP3] = useState<Phase3Result | null>(null);
+
+  const phase2Fired = useRef(false);
+  const phase3Fired = useRef(false);
+  const isAnimating = useRef(false);
+  const cardAnim = useRef(new Animated.Value(1)).current;
+
+  // ── Boot: load profile, compute engine values, fire Phase 1 ─────────────────
 
   useEffect(() => {
-    analyzeGoal(stats, goalText, calcs)
-      .then(setResult)
-      .catch(() => setError('Something went wrong analysing your goal. Please try again.'))
-      .finally(() => setLoading(false));
+    (async () => {
+      const p = await loadUserProfile();
+      if (!p) return;
+
+      const s = profileToStats(p);
+      const c = computeBodyStats(s);
+      const goalType = classifyGoal(p.goalText, c.bfPercent, s.sex);
+      const calorieTarget = calcCalorieTarget(c.tdee, goalType);
+      const { proteinG, fatsG, carbsG } = calcMacros(calorieTarget, c.lbmKg, goalType);
+
+      const enriched: UserProfile = {
+        ...p,
+        bmr: c.bmr,
+        tdee: c.tdee,
+        bfPercent: c.bfPercent,
+        fatMassKg: c.fatMassKg,
+        lbmKg: c.lbmKg,
+        goalType,
+        calorieTarget,
+        proteinG,
+        carbsG,
+        fatsG,
+        goalOffset: calorieTarget - c.tdee,
+      };
+
+      await saveUserProfile(enriched);
+      setProfile(enriched);
+      setCalcs(c);
+
+      // Phase 1 fires immediately
+      const result = await runPhase1(enriched, c);
+      setP1(result);
+    })();
   }, []);
 
-  const journey: GoalJourney | undefined =
-    result?.journey ??
-    result?.alternativeGoal?.journey ??
-    undefined;
+  // ── Phase 2 — fires when card 0 (whatYouSaid) is displayed ──────────────────
 
-  const isRehab = result?.goalType === 'rehabilitation';
+  useEffect(() => {
+    if (!profile || !calcs || !p1 || cardIndex < PHASE2_TRIGGER || phase2Fired.current) return;
+    phase2Fired.current = true;
+    runPhase2(profile, calcs, p1).then(setP2);
+  }, [cardIndex, p1, profile, calcs]);
 
-  function runAnalysis() {
-    setError(null);
-    setLoading(true);
-    analyzeGoal(stats, goalText, calcs)
-      .then(setResult)
-      .catch(() => setError('Something went wrong analysing your goal. Please try again.'))
-      .finally(() => setLoading(false));
+  // ── Phase 3 — fires when card 3 (currentReality) is displayed ───────────────
+
+  useEffect(() => {
+    if (!profile || !calcs || !p1 || !p2 || cardIndex < PHASE3_TRIGGER || phase3Fired.current) return;
+    phase3Fired.current = true;
+    runPhase3(profile, calcs, p1, p2).then(async (result) => {
+      setP3(result);
+      // Persist target data once we have it
+      if (result.feasible) {
+        await saveUserProfile({
+          targetWeightKg: result.optimisedGoal.targetWeightKg || undefined,
+          targetBFPercent: result.optimisedGoal.targetBFPercent || undefined,
+        });
+      }
+    });
+  }, [cardIndex, p1, p2, profile, calcs]);
+
+  // ── Navigation between cards ─────────────────────────────────────────────────
+
+  function advanceCard() {
+    if (isAnimating.current) return;
+    isAnimating.current = true;
+    Animated.timing(cardAnim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => {
+      setCardIndex(i => Math.min(i + 1, TOTAL_CARDS - 1));
+      cardAnim.setValue(0);
+      Animated.timing(cardAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start(() => {
+        isAnimating.current = false;
+      });
+    });
   }
 
+  function isCurrentCardReady(idx: number): boolean {
+    if (idx <= CARD.WHY_WE_THINK)            return p1 !== null;
+    if (idx <= CARD.TIMELINE)                return p2 !== null;
+    return p3 !== null;
+  }
+
+  function canAdvance(): boolean {
+    if (cardIndex >= TOTAL_CARDS - 1) return false;
+    if (cardIndex === CARD.OPTIMISED_GOAL && p3 && !p3.feasible) return pathChoice !== null;
+    return isCurrentCardReady(cardIndex) && isCurrentCardReady(cardIndex + 1);
+  }
+
+  // ── Card content resolver ────────────────────────────────────────────────────
+
+  function renderCardContent(idx: number): React.ReactNode {
+    switch (idx) {
+      case CARD.WHAT_YOU_SAID:
+        return <CardText text={p1?.whatYouSaid ?? ''} />;
+      case CARD.WHAT_WE_MEAN:
+        return <CardText text={p1?.whatWeMean ?? ''} />;
+      case CARD.WHY_WE_THINK:
+        return <CardText text={p1?.whyWeThinkThat ?? ''} />;
+      case CARD.CURRENT_REALITY:
+        return <CardText text={p2?.currentReality ?? ''} />;
+      case CARD.ADVANTAGES:
+        return <CardText text={p2?.advantages ?? ''} />;
+      case CARD.CHALLENGES:
+        return <CardText text={p2?.challenges ?? ''} />;
+      case CARD.WHAT_MUST_CHANGE:
+        return <CardText text={p2?.whatMustChange ?? ''} />;
+      case CARD.TIMELINE:
+        return <CardText text={p2?.timeline ?? ''} />;
+      case CARD.SCIENTIFIC_TRANSLATION:
+        return <CardText text={p3?.scientificTranslation ?? ''} />;
+      case CARD.REALITY_ASSESSMENT:
+        return <CardText text={p3?.realityAssessment ?? ''} />;
+      case CARD.OPTIMISED_GOAL:
+        return renderOptimisedGoalCard();
+      case CARD.FIRST_MILESTONE:
+        return renderMilestoneCard();
+      case CARD.LONG_TERM_VISION:
+        return renderVisionCard();
+      default:
+        return null;
+    }
+  }
+
+  function renderOptimisedGoalCard(): React.ReactNode {
+    if (!p3) return null;
+    if (p3.feasible) {
+      return (
+        <>
+          <View style={styles.targetRow}>
+            <View style={styles.targetChip}>
+              <Text style={styles.targetChipLabel}>TARGET WEIGHT</Text>
+              <Text style={styles.targetChipValue}>{p3.optimisedGoal.targetWeightKg} kg</Text>
+            </View>
+            <View style={styles.targetChip}>
+              <Text style={styles.targetChipLabel}>TARGET BF%</Text>
+              <Text style={styles.targetChipValue}>{p3.optimisedGoal.targetBFPercent}%</Text>
+            </View>
+          </View>
+          <CardText text={p3.optimisedGoal.description} />
+        </>
+      );
+    }
+
+    const inf = p3 as Phase3InfeasibleResult;
+    return (
+      <View style={styles.optionsList}>
+        <Text style={styles.optionsIntro}>
+          The literal goal isn't achievable naturally — but what you're after IS. Choose your path:
+        </Text>
+        <OptionCard
+          letter="A"
+          title={inf.optionA.title}
+          description={inf.optionA.description}
+          selected={pathChoice === 'a'}
+          onSelect={() => {
+            setPathChoice('a');
+            saveUserProfile({
+              targetWeightKg: inf.optionA.targetWeightKg || undefined,
+              targetBFPercent: inf.optionA.targetBFPercent || undefined,
+              goalPathChoice: 'a',
+            });
+          }}
+        />
+        <OptionCard
+          letter="B"
+          title={inf.optionB.title}
+          description={inf.optionB.description}
+          selected={pathChoice === 'b'}
+          onSelect={() => {
+            setPathChoice('b');
+            saveUserProfile({
+              targetWeightKg: inf.optionB.targetWeightKg || undefined,
+              targetBFPercent: inf.optionB.targetBFPercent || undefined,
+              goalPathChoice: 'b',
+            });
+          }}
+        />
+      </View>
+    );
+  }
+
+  function renderMilestoneCard(): React.ReactNode {
+    if (!p3) return null;
+    if (p3.feasible) return <CardText text={p3.firstMilestone} />;
+    const inf = p3 as Phase3InfeasibleResult;
+    const text = pathChoice === 'b' ? inf.firstMilestoneB : inf.firstMilestoneA;
+    return <CardText text={text} />;
+  }
+
+  function renderVisionCard(): React.ReactNode {
+    if (!p3) return null;
+    if (p3.feasible) return <CardText text={p3.longTermVision} />;
+    const inf = p3 as Phase3InfeasibleResult;
+    const text = pathChoice === 'b' ? inf.longTermVisionB : inf.longTermVisionA;
+    return <CardText text={text} />;
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────────
+
+  const isLastCard = cardIndex >= TOTAL_CARDS - 1;
+  const ready = isCurrentCardReady(cardIndex);
+
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + spacing.xs }]}>
+      <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -251,183 +416,66 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
           <Ionicons name="chevron-back" size={24} color={colors.text.secondary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Goal Analysis</Text>
-        <View style={{ width: 24 }} />
+        <Text style={styles.headerCount}>{cardIndex + 1} / {TOTAL_CARDS}</Text>
       </View>
 
+      <View style={styles.dots}>
+        {Array.from({ length: TOTAL_CARDS }).map((_, i) => (
+          <View
+            key={i}
+            style={[styles.dot, i === cardIndex && styles.dotActive, i < cardIndex && styles.dotDone]}
+          />
+        ))}
+      </View>
+
+      {/* Card area */}
       <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          { paddingBottom: insets.bottom + 140 },
-        ]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Loading */}
-        {loading && (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Analysing your goal…</Text>
-            <Text style={styles.loadingSubText}>
-              We're breaking down what your goal actually means and what it'll take to get there.
-            </Text>
-          </View>
-        )}
-
-        {/* Error */}
-        {error && !loading && (
-          <View style={styles.errorBox}>
-            <Ionicons name="alert-circle-outline" size={40} color={colors.danger} />
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={runAnalysis}>
-              <Text style={styles.retryBtnText}>Try again</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Content */}
-        {result && !loading && (
-          <View style={styles.content}>
-
-            {/* ── Disclaimer ──────────────────────────────────────────────── */}
-            <View style={styles.disclaimer}>
-              <Ionicons name="information-circle-outline" size={16} color={colors.text.muted} />
-              <Text style={styles.disclaimerText}>
-                Don't be put off if you don't recognise terms like calories or body fat — Gymman
-                will walk you through everything before it actually matters for you.
-              </Text>
-            </View>
-
-            {/* ── Section 1: Verdict ───────────────────────────────────────── */}
-            {!isRehab && result.realisticVerdict && (
-              <VerdictCard
-                verdict={result.realisticVerdict}
-                isFeasible={result.isFeasible}
-                journey={journey}
-              />
-            )}
-
-            {/* ── Section 2: Simplified goal ───────────────────────────────── */}
-            {!isRehab && result.isFeasible !== false && result.goalSimplified && (
-              <SectionCard
-                icon="flag-outline"
-                iconColor={colors.primaryLight}
-                label="YOUR GOAL, SIMPLIFIED"
-                title="What you're actually after"
-              >
-                <Paragraphs text={result.goalSimplified} />
-              </SectionCard>
-            )}
-
-            {/* ── Section 2 (infeasible): Alternative simplified ───────────── */}
-            {!isRehab && result.isFeasible === false && result.alternativeGoal && (
-              <SectionCard
-                icon="rocket-outline"
-                iconColor={colors.primaryLight}
-                label="YOUR ACTUAL TARGET"
-                title={result.alternativeGoal.title}
-                accent
-              >
-                <Text style={styles.salesPitch}>{result.alternativeGoal.salesPitch}</Text>
-                <View style={styles.cardDivider} />
-                <Paragraphs text={result.alternativeGoal.goalSimplified} />
-              </SectionCard>
-            )}
-
-            {/* ── Section 3: Complete analysis ─────────────────────────────── */}
-            <SectionCard
-              icon="telescope-outline"
-              iconColor={colors.info}
-              label={isRehab ? 'UNDERSTANDING YOUR GOAL' : 'WHAT YOUR GOAL REALLY MEANS'}
-              title={isRehab ? 'Understanding your goal' : 'The full picture'}
-            >
-              <Paragraphs text={result.goalInterpretation} />
-            </SectionCard>
-
-            {/* ── Rehab guidance ───────────────────────────────────────────── */}
-            {isRehab && result.rehabilitationGuidance && (
-              <SectionCard
-                icon="medkit-outline"
-                iconColor={colors.gold}
-                label="WHAT WE RECOMMEND"
-                title="Your next step"
-              >
-                <Paragraphs text={result.rehabilitationGuidance} />
-              </SectionCard>
-            )}
-
-            {/* ── Section 4: Your Situation ────────────────────────────────── */}
-            {!isRehab && result.situationAnalysis && (
-              <SectionCard
-                icon="person-outline"
-                iconColor={colors.gold}
-                label="YOUR SITUATION"
-                title="What this means for you"
-              >
-                <Paragraphs text={result.situationAnalysis} />
-              </SectionCard>
-            )}
-
-            {/* ── Foundation goal (infeasible path only) ───────────────────── */}
-            {!isRehab && result.isFeasible === false && result.foundationGoal && (
-              <SectionCard
-                icon="layers-outline"
-                iconColor={colors.info}
-                label="YOUR NATURAL PEAK"
-                title={result.foundationGoal.title}
-              >
-                <Text style={styles.rationaleText}>{result.foundationGoal.rationale}</Text>
-                <View style={styles.cardDivider} />
-                <Paragraphs text={result.foundationGoal.goalSimplified} />
-              </SectionCard>
-            )}
-
-            {/* ── Journey: Now and Target ───────────────────────────────────── */}
-            {journey && !isRehab && (
-              <JourneyCard stats={stats} calcs={calcs} journey={journey} />
-            )}
-
-            {/* ── Education ────────────────────────────────────────────────── */}
-            <View style={styles.educationBlock}>
-              <Text style={styles.educationTitle}>{result.educationTitle}</Text>
-              <Paragraphs text={result.educationContent} style={styles.educationBody} />
-            </View>
-
-            {/* ── Transition text ──────────────────────────────────────────── */}
-            <Text style={styles.transitionText}>
-              It's completely okay if you still don't fully grasp your goal — that's exactly
-              what we're here for. Let's keep going and make it even clearer.
-            </Text>
-
-          </View>
-        )}
+        {ready
+          ? (
+            <CardShell cardIndex={cardIndex} anim={cardAnim}>
+              {renderCardContent(cardIndex)}
+            </CardShell>
+          )
+          : <CardLoading cardIndex={cardIndex} />
+        }
       </ScrollView>
 
-      {/* Footer CTA */}
-      {result && !loading && (
-        <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-          {!isRehab && (
-            <Text style={styles.footerHint}>
-              Now that you know what your goal actually means, let's see how you can
-              execute it. First, let's check your numbers — the scary stuff like calories
-              and such. Don't worry, we'll teach you.
-            </Text>
-          )}
+      {/* Footer */}
+      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
+        {isLastCard ? (
           <TouchableOpacity
-            style={styles.ctaBtn}
+            style={styles.cta}
+            onPress={() => navigation.navigate('ExecutionPlan')}
             activeOpacity={0.85}
-            onPress={() => navigation.navigate('ExecutionPlan', { stats, goalText, targetWeightKg: journey?.targetWeightKg })}
           >
-            <Text style={styles.ctaBtnText}>
-              {isRehab ? 'Back to onboarding' : 'Check my numbers'}
-            </Text>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={colors.text.inverse}
-              style={{ marginLeft: 4 }}
-            />
+            <Text style={styles.ctaText}>See my execution plan</Text>
+            <Ionicons name="arrow-forward" size={18} color={colors.text.inverse} style={{ marginLeft: 6 }} />
           </TouchableOpacity>
-        </View>
-      )}
+        ) : (
+          <TouchableOpacity
+            style={[styles.cta, !canAdvance() && styles.ctaDisabled]}
+            onPress={advanceCard}
+            disabled={!canAdvance()}
+            activeOpacity={0.85}
+          >
+            {!isCurrentCardReady(cardIndex + 1) ? (
+              <>
+                <ActivityIndicator size="small" color={colors.text.inverse} style={{ marginRight: 8 }} />
+                <Text style={styles.ctaText}>Preparing next…</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.ctaText}>Next</Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.text.inverse} style={{ marginLeft: 4 }} />
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+
     </View>
   );
 }
@@ -435,10 +483,7 @@ export function GoalAnalysisScreen({ navigation, route }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.bg.app,
-  },
+  root: { flex: 1, backgroundColor: colors.bg.app },
 
   header: {
     flexDirection: 'row',
@@ -449,81 +494,34 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border.subtle,
   },
-  headerTitle: {
-    ...typography.subhead,
-    color: colors.text.secondary,
+  headerTitle: { ...typography.subhead, color: colors.text.secondary },
+  headerCount:  { ...typography.footnote, color: colors.text.muted },
+
+  dots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    gap: 5,
+  },
+  dot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: colors.border.default,
+  },
+  dotActive: {
+    width: 16,
+    backgroundColor: colors.primary,
+    borderRadius: 3,
+  },
+  dotDone: {
+    backgroundColor: colors.primary + '55',
   },
 
   scroll: {
     paddingHorizontal: spacing.screenPadding,
-    paddingTop: spacing.lg,
-  },
-
-  // ── Loading / error ──────────────────────────────────────────────────────────
-  loadingBox: {
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingTop: spacing['2xl'],
-    paddingHorizontal: spacing.xl,
-  },
-  loadingText: {
-    ...typography.title3,
-    color: colors.text.primary,
-    textAlign: 'center',
-  },
-  loadingSubText: {
-    ...typography.callout,
-    color: colors.text.muted,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-
-  errorBox: {
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingTop: spacing['2xl'],
-    paddingHorizontal: spacing.xl,
-  },
-  errorText: {
-    ...typography.callout,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  retryBtn: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.button,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-  },
-  retryBtnText: {
-    ...typography.subhead,
-    color: colors.text.primary,
-  },
-
-  // ── Content wrapper ──────────────────────────────────────────────────────────
-  content: {
-    gap: spacing.md,
-  },
-
-  // ── Disclaimer ───────────────────────────────────────────────────────────────
-  disclaimer: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'flex-start',
-    backgroundColor: colors.bg.card,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-    padding: spacing.md,
-  },
-  disclaimerText: {
-    ...typography.footnote,
-    color: colors.text.muted,
-    flex: 1,
-    lineHeight: 19,
-    fontStyle: 'italic',
+    paddingTop: spacing.md,
   },
 
   // ── Card ─────────────────────────────────────────────────────────────────────
@@ -532,151 +530,128 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border.default,
-    padding: spacing.md,
+    overflow: 'hidden',
   },
-  cardAccent: {
-    borderColor: colors.primaryBorder,
-    backgroundColor: colors.bg.elevated,
+  cardLoading: {
+    opacity: 0.7,
   },
   cardHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: spacing.sm,
-    marginBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    backgroundColor: colors.bg.elevated,
   },
-  iconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: radius.md,
+  cardIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
-    marginTop: 2,
   },
   cardLabel: {
     ...typography.label,
     color: colors.text.muted,
-    marginBottom: 2,
-  },
-  cardTitle: {
-    ...typography.subhead,
-    color: colors.text.primary,
-    fontWeight: '600',
-    lineHeight: 21,
+    letterSpacing: 0.5,
   },
   cardDivider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.border.subtle,
-    marginVertical: spacing.sm,
   },
-
-  // ── Body text ─────────────────────────────────────────────────────────────────
-  bodyText: {
-    ...typography.callout,
-    color: colors.text.secondary,
-    lineHeight: 23,
-  },
-
-  // ── Verdict card meta ────────────────────────────────────────────────────────
-  verdictMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  cardBody: {
+    padding: spacing.md,
     gap: spacing.sm,
   },
-  verdictMetaText: {
-    ...typography.footnote,
+  cardBodyText: {
+    ...typography.callout,
+    color: colors.text.secondary,
+    lineHeight: 24,
+  },
+  cardLoadingBody: {
+    padding: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.sm,
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  cardLoadingText: {
+    ...typography.callout,
     color: colors.text.muted,
-    lineHeight: 19,
   },
 
-  // ── Sales pitch / rationale ───────────────────────────────────────────────────
-  salesPitch: {
-    ...typography.callout,
-    color: colors.primaryLight,
-    lineHeight: 23,
-    fontWeight: '500',
-    marginBottom: spacing.xs,
+  // ── Optimised goal target chips ───────────────────────────────────────────────
+  targetRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
-  rationaleText: {
-    ...typography.callout,
-    color: colors.info,
-    lineHeight: 23,
-    fontStyle: 'italic',
-    marginBottom: spacing.xs,
-  },
-
-  // ── Education block ───────────────────────────────────────────────────────────
-  educationBlock: {
+  targetChip: {
+    flex: 1,
     backgroundColor: colors.bg.elevated,
-    borderRadius: radius.card,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border.default,
-    padding: spacing.md,
-    gap: spacing.md,
-  },
-  educationTitle: {
-    ...typography.label,
-    color: colors.text.muted,
-    marginBottom: spacing.xs,
-  },
-  educationBody: {
-    color: colors.text.secondary,
-  },
-
-  // ── Journey card ──────────────────────────────────────────────────────────────
-  journeyRow: {
-    flexDirection: 'row',
+    padding: spacing.sm,
     alignItems: 'center',
-    paddingVertical: spacing.sm,
   },
-  journeyRowBorder: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border.subtle,
-  },
-  journeyColHead: {
+  targetChipLabel: {
     ...typography.label,
     color: colors.text.muted,
+    marginBottom: 3,
   },
-  journeyCell: {
-    flex: 2,
-  },
-  journeyRowLabel: {
-    ...typography.footnote,
-    color: colors.text.muted,
-  },
-  journeyNow: {
+  targetChipValue: {
     ...typography.subhead,
-    color: colors.text.secondary,
-  },
-  journeyTarget: {
-    ...typography.subhead,
-    color: colors.success,
+    color: colors.primary,
     fontWeight: '600',
   },
-  journeyMeta: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    marginTop: spacing.xs,
-  },
-  journeyMetaText: {
-    ...typography.footnote,
-    color: colors.text.muted,
-    flex: 1,
-    lineHeight: 19,
-  },
 
-  // ── Transition text ───────────────────────────────────────────────────────────
-  transitionText: {
+  // ── Option A/B ────────────────────────────────────────────────────────────────
+  optionsList: {
+    gap: spacing.md,
+  },
+  optionsIntro: {
     ...typography.callout,
-    color: colors.text.muted,
+    color: colors.text.secondary,
     lineHeight: 23,
-    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  optionCard: {
+    backgroundColor: colors.bg.elevated,
+    borderRadius: radius.card,
+    borderWidth: 1.5,
+    borderColor: colors.border.default,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  optionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  optionBadge: {
     paddingHorizontal: spacing.sm,
-    fontStyle: 'italic',
+    paddingVertical: 3,
+    borderRadius: radius.full,
+  },
+  optionBadgeText: {
+    ...typography.label,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  optionTitle: {
+    ...typography.subhead,
+    color: colors.text.primary,
+    fontWeight: '600',
+  },
+  optionDesc: {
+    ...typography.callout,
+    color: colors.text.secondary,
+    lineHeight: 22,
   },
 
-  // ── Footer ───────────────────────────────────────────────────────────────────
+  // ── Footer ────────────────────────────────────────────────────────────────────
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -687,24 +662,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.app,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border.subtle,
-    gap: spacing.sm,
   },
-  footerHint: {
-    ...typography.footnote,
-    color: colors.text.muted,
-    lineHeight: 18,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  ctaBtn: {
+  cta: {
     height: spacing.buttonHeight,
     backgroundColor: colors.primary,
     borderRadius: radius.button,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
   },
-  ctaBtnText: {
+  ctaDisabled: {
+    backgroundColor: colors.bg.elevated,
+  },
+  ctaText: {
     fontFamily: typography.fonts.display,
     fontSize: 16,
     letterSpacing: 1,

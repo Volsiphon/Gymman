@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
-import type { OnboardingStackParamList } from '@/navigation/navigation';
+import type { OnboardingStackParamList } from '@/app/navigation';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -228,7 +228,7 @@ export function PhotoCaptureScreen({ navigation, route }: Props) {
       <View style={[styles.actions, { paddingBottom: insets.bottom + spacing.md }]}>
         <TouchableOpacity
           style={[styles.continueBtn, !canContinue && styles.continueBtnDisabled]}
-          onPress={() => navigation.navigate('GoalAnalysis', { stats: route.params.stats, goalText: route.params.goalText })}
+          onPress={() => navigation.navigate('StatsReveal')}
           disabled={!canContinue}
           activeOpacity={0.85}
         >
@@ -239,7 +239,7 @@ export function PhotoCaptureScreen({ navigation, route }: Props) {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          onPress={() => navigation.navigate('GoalAnalysis', { stats: route.params.stats, goalText: route.params.goalText })}
+          onPress={() => navigation.navigate('StatsReveal')}
           activeOpacity={0.7}
         >
           <Text style={styles.skipText}>Skip for now</Text>

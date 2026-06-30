@@ -10,7 +10,7 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
-import { RootNavigator } from '@/navigation/navigation';
+import { RootNavigator } from '@/app/navigation';
 import { colors } from '@/theme/colors';
 
 function App() {

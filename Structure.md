@@ -383,3 +383,5 @@ App.tsx
 | Add a new language                 | Add `locales/xx/`, register in `i18n/`     | Everything else                |
 | Navigation structure               | `src/app/navigation/`                      | All feature modules            |
 | Subscription tier definitions      | `store/subscription/` + `subscriptionLimits.ts` | All feature logic         |
+
+

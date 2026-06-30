@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { RoutineChangeEvent } from '@/types/workoutLog';
+import type { RoutineChangeEvent } from '@/types/plan';
 
 const KEY = '@gymman:routineChanges';
 

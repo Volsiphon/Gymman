@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Routine } from '@/types/routine';
+import type { Routine } from '@/types/plan';
 
 const KEY = '@gymman:routines';
 

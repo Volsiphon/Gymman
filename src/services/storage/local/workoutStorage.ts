@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { WorkoutLog } from '@/types/workoutLog';
+import type { WorkoutLog } from '@/types/plan';
 
 const KEY = '@gymman:workoutLogs';
 

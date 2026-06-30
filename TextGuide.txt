@@ -1,0 +1,68 @@
+Here's a clear picture of where the app stands: ~127 source files across modules, engine, services, store, navigation, theme, types, and i18n.
+
+The best way to rebuild and learn is to follow the dependency graph from bottom to top — start with what has zero dependencies, and only move up once what you're building on is solid. Here's the exact order I'd suggest:
+
+Phase 1 — The Contracts (zero dependencies, pure reading)
+src/types/ — Start here. These are just TypeScript interfaces describing data shapes: what a UserProfile looks like, what a FoodEntry contains, what a ChatMessage holds. Nothing depends on anything yet. Reading these tells you what the entire app is made of before you write a single function.
+
+Order inside: user.ts → plan.ts → coaching.ts → shop.ts
+
+Phase 2 — Visual Foundation
+src/theme/ — colors.ts, spacing.ts, typography.ts. The simplest files in the project. No logic, no imports. Just named values. Satisfying to write from scratch and you'll reference them everywhere after.
+
+Phase 3 — The Math Brain (pure functions, fully isolated)
+src/engine/ — Pure TypeScript functions, no React, no UI, no I/O. Given inputs → return output. This is the best place to practice TypeScript and understand fitness formulas.
+
+Order: body-metrics/ (BMR → TDEE → BMI → body-fat → lean-mass) → goal-engine/ → calorie-engine/ → weekly-review/
+
+You can run and test every single function here in isolation, without even launching the app. That's powerful for learning.
+
+Phase 4 — Local Storage
+src/services/storage/local/ — Thin wrappers around AsyncStorage. Learn async/await here. Nothing complex, but you'll use these patterns everywhere.
+
+Phase 5 — Global State
+src/store/ — This is Zustand (or similar). Learn the pattern once, then it repeats across user/, plan/, streak/, subscription/, language/. Start with user/index.ts since it's the most central.
+
+Phase 6 — Translation Setup
+src/i18n/ + src/locales/en/ — Set up i18next, wire the language detector, write all English strings. The Malayalam/Manglish content can come much later.
+
+Phase 7 — Shared UI Toolkit
+src/shared/ — Now you build actual React Native components. Start with Button.tsx, Input.tsx, Card.tsx, Modal.tsx — the primitives. Then the custom hooks (useLocalDate, useSubscription, usePremiumGate). Then utilities.
+
+This is where you first write JSX using the theme tokens you defined in Phase 2.
+
+Phase 8 — Navigation Skeleton
+src/navigation/ — The spine of the app. Start with RootNavigator.tsx (the entry decision: onboarded or not), then OnboardingNavigator.tsx, then MainTabNavigator.tsx. The app can run with empty placeholder screens at this point.
+
+Phase 9 — Onboarding (first complete feature)
+src/modules/onboarding/ — This is the most important module to understand deeply because it touches nearly everything: form state, AI calls, engine calculations, storage writes, navigation. Screen order follows the user journey:
+
+LanguageSelectionScreen → LoginScreen → PhysicalStatsScreen → PhotoCaptureScreen → GoalDescriptionScreen → GoalAnalysisScreen → StatsRevealScreen → ExecutionPlanScreen
+
+Phase 10 — Main Modules (simple to complex)
+Work through these in this order, since they build in complexity:
+
+Progress — just a weight log + chart. A good first main-tab module.
+Photos — camera, gallery, grid view. Slightly more complex UI.
+Streak — cross-cutting display logic, but the core is simple.
+Shop — mostly display, no AI.
+Plan/Calory Burn — logging activity, no AI.
+Account — profile display, RPG ranking.
+Plan/Diet — diet tracking + AI nutrition coach. Where AI first appears.
+Plan/Training — routines, logs, progressive overload, AI trainer.
+Coach — the master AI with full context. The most complex module.
+Phase 11 — AI Services
+src/services/ai/ — Start with client.ts (the shared connection), then each coach file in the same order as the modules above: nutritionCoach.ts → trainerCoach.ts → goalAnalyzer.ts → chatManager.ts.
+
+Phase 12 — Premium Infrastructure
+src/services/auth/ → src/services/storage/cloud/ → src/services/sync/ → src/navigation/providers/
+
+These are last because they layer on top of everything. Without understanding what they're gatekeeping, the premium logic won't make sense.
+
+The meta-rule for learning each file
+For every file you open:
+
+Read the existing code and understand it fully before writing anything
+Close it and try writing it from scratch yourself
+Compare — the gaps between your version and the original are exactly what you learn
+Start with Phase 1 whenever you're ready — src/types/user.ts is the natural first file.

@@ -1,7 +1,7 @@
 export { LanguageSelectionScreen } from './screens/LanguageSelectionScreen';
 export { LoginScreen } from './screens/LoginScreen';
 export { WelcomeScreen } from './screens/WelcomeScreen';
-export { PhysicalStatsScreen } from './screens/PhysicalStatsScreen';
+export { OnboardingChatScreen } from './screens/OnboardingChatScreen';
 export { PhotoCaptureScreen } from './screens/PhotoCaptureScreen';
 export { GoalDescriptionScreen } from './screens/GoalDescriptionScreen';
 export { GoalAnalysisScreen } from './screens/GoalAnalysisScreen';

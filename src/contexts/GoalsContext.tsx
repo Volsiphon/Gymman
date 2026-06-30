@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { loadNutritionGoals, type NutritionGoals } from '@/services/storage/local/profileStorage';
+import { loadUserProfile } from '@/services/storage/local/userProfileStorage';
 import { loadDynamicMode, loadTodayActivities } from '@/services/storage/local/caloryBurnStorage';
-import { loadUserBio } from '@/services/storage/local/userBioStorage';
+import { calcDynamicTarget } from '@/engine/nutrition';
+
+type NutritionGoals = { calories: number; protein: number; carbs: number; fats: number };
 
 const DEFAULT_GOALS: NutritionGoals = { calories: 1700, protein: 130, carbs: 170, fats: 47 };
 
@@ -22,18 +24,19 @@ export function GoalsProvider({ children }: { children: React.ReactNode }) {
   const [isDynamic, setIsDynamic] = useState(false);
 
   const refresh = useCallback(async () => {
-    const [base, on, acts, bio] = await Promise.all([
-      loadNutritionGoals(),
+    const [profile, on, acts] = await Promise.all([
+      loadUserProfile(),
       loadDynamicMode(),
       loadTodayActivities(),
-      loadUserBio(),
     ]);
 
-    const baseGoals = base ?? DEFAULT_GOALS;
+    const baseGoals: NutritionGoals = profile?.calorieTarget
+      ? { calories: profile.calorieTarget, protein: profile.proteinG ?? 130, carbs: profile.carbsG ?? 170, fats: profile.fatsG ?? 47 }
+      : DEFAULT_GOALS;
 
-    if (on && bio) {
+    if (on && profile?.bmr && profile.goalOffset !== undefined) {
       const burned = acts.reduce((s, a) => s + a.caloriesBurned, 0);
-      const dynCal = Math.round(bio.bmr * 1.2) + burned + bio.goalOffset;
+      const dynCal = calcDynamicTarget(profile.bmr, burned, profile.goalOffset);
       setGoals({ ...baseGoals, calories: dynCal });
       setIsDynamic(true);
     } else {

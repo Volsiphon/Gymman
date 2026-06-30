@@ -9,14 +9,27 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { OnboardingStackParamList } from '@/navigation/navigation';
+import type { OnboardingStackParamList } from '@/app/navigation';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
+
+const REHAB_KEYWORDS = [
+  'injury', 'injuri', 'surgery', 'sciatica', 'arthritis',
+  'herniat', 'disc', 'fracture', 'ligament', 'chronic pain', 'rehab',
+  'posture', 'slouch', 'hunch', 'rounded shoulder', 'forward head',
+  'back pain', 'neck pain', 'joint pain', 'knee pain', 'shoulder pain',
+];
+
+function isRehabGoal(text: string): boolean {
+  const lower = text.toLowerCase();
+  return REHAB_KEYWORDS.some(k => lower.includes(k));
+}
 
 type Props = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'GoalDescription'>;
@@ -30,6 +43,7 @@ export function GoalDescriptionScreen({ navigation }: Props) {
   const inputRef = useRef<TextInput>(null);
 
   const [text, setText] = useState('');
+  const [rehabWarning, setRehabWarning] = useState(false);
 
   const heroAnim = useRef(new Animated.Value(0)).current;
   const formAnim = useRef(new Animated.Value(0)).current;
@@ -121,7 +135,10 @@ export function GoalDescriptionScreen({ navigation }: Props) {
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
         <TouchableOpacity
           style={[styles.continueBtn, !isValid && styles.continueBtnDisabled]}
-          onPress={() => navigation.navigate('PhysicalStats', { goalText: text })}
+          onPress={() => {
+            if (isRehabGoal(text)) { setRehabWarning(true); return; }
+            navigation.navigate('OnboardingChat', { goalText: text });
+          }}
           disabled={!isValid}
           activeOpacity={0.85}
         >
@@ -135,6 +152,46 @@ export function GoalDescriptionScreen({ navigation }: Props) {
             style={{ marginLeft: 4 }}
           />
         </TouchableOpacity>
+
+        <Modal
+          visible={rehabWarning}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setRehabWarning(false)}
+          statusBarTranslucent
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={[styles.modalSheet, { paddingBottom: insets.bottom + spacing.lg }]}>
+              <View style={styles.modalHandle} />
+              <View style={styles.modalIconRow}>
+                <Ionicons name="construct-outline" size={28} color={colors.gold} />
+              </View>
+              <Text style={styles.modalTitle}>Gymman is still new here</Text>
+              <Text style={styles.modalBody}>
+                Your goal sounds like it involves injury or rehab — an area that needs professional guidance and personalised care.{'\n\n'}
+                Gymman is still building a proper Rehabilitation Coach experience. Right now the app is optimised for fitness goals: fat loss, muscle gain, body recomposition, and athletic performance.{'\n\n'}
+                You can re-describe your goal as a fitness goal, or continue knowing the current version of Gymman may not fully serve your rehab needs.
+              </Text>
+              <TouchableOpacity
+                style={styles.modalBtnPrimary}
+                onPress={() => setRehabWarning(false)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.modalBtnPrimaryText}>Re-describe my goal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalBtnSecondary}
+                onPress={() => {
+                  setRehabWarning(false);
+                  navigation.navigate('OnboardingChat', { goalText: text });
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalBtnSecondaryText}>Continue anyway</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </View>
     </KeyboardAvoidingView>
   );
@@ -244,5 +301,67 @@ const styles = StyleSheet.create({
   },
   continueBtnTextDisabled: {
     color: colors.text.disabled,
+  },
+
+  // Rehab modal
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: colors.bg.card,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    borderTopWidth: 1,
+    borderColor: colors.border.default,
+    paddingHorizontal: spacing.screenPadding,
+    paddingTop: spacing.sm,
+    gap: spacing.md,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border.default,
+    alignSelf: 'center',
+    marginBottom: spacing.xs,
+  },
+  modalIconRow: {
+    alignItems: 'center',
+    paddingTop: spacing.xs,
+  },
+  modalTitle: {
+    fontFamily: typography.fonts.display,
+    fontSize: 22,
+    letterSpacing: 0.3,
+    color: colors.text.primary,
+    textAlign: 'center',
+  },
+  modalBody: {
+    ...typography.callout,
+    color: colors.text.secondary,
+    lineHeight: 23,
+  },
+  modalBtnPrimary: {
+    height: spacing.buttonHeight,
+    backgroundColor: colors.primary,
+    borderRadius: radius.button,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBtnPrimaryText: {
+    fontFamily: typography.fonts.display,
+    fontSize: 16,
+    letterSpacing: 1,
+    color: colors.text.inverse,
+  },
+  modalBtnSecondary: {
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  modalBtnSecondaryText: {
+    ...typography.callout,
+    color: colors.text.muted,
   },
 });

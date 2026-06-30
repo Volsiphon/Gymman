@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,204 +6,315 @@ import {
   TouchableOpacity,
   Animated,
   StyleSheet,
+  ActivityIndicator,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RouteProp } from '@react-navigation/native';
-import type { OnboardingStackParamList } from '@/navigation/navigation';
-import { computeBodyStats } from '@/modules/onboarding/utils/fitnessCalculations';
+import type { OnboardingStackParamList } from '@/app/navigation';
+import { computeBodyStats } from '@/engine/body-metrics';
+import type { BodyCompositionStats } from '@/engine/body-metrics';
+import { classifyGoal } from '@/engine/goal-engine';
+import { calcCalorieTarget, calcMacros } from '@/engine/nutrition';
+import { loadUserProfile, profileToStats, saveUserProfile } from '@/services/storage/local/userProfileStorage';
+import type { UserProfile } from '@/services/storage/local/userProfileStorage';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
 type Props = {
   navigation: NativeStackNavigationProp<OnboardingStackParamList, 'StatsReveal'>;
-  route: RouteProp<OnboardingStackParamList, 'StatsReveal'>;
 };
 
-// ─── Activity level display labels ───────────────────────────────────────────
+// ─── Info definitions ─────────────────────────────────────────────────────────
+
+type InfoEntry = { term: string; text: string };
+
+const INFOS: Record<string, InfoEntry> = {
+  measurements: {
+    term: 'Body Measurements',
+    text: "Neck, waist, and hip measurements let us estimate your body fat using the US Navy formula — the most accurate method short of a lab scan. A 1 cm measurement error shifts the result by roughly 1%, so honest numbers give better results.",
+  },
+  activityLevel: {
+    term: 'Activity Level',
+    text: "How active you are on a typical day. This gets multiplied by your BMR to estimate the total calories you burn daily. That's why our system does weekly result and process analysis to make sure all your data is dynamic and on point. We make sure you progress without any errors in the plan.",
+  },
+  goalType: {
+    term: 'Goal Classification',
+    text: "How we interpreted your goal. Fat Loss means your plan runs at a calorie deficit to burn stored fat. Muscle Gain means a small surplus to fuel new muscle growth. Recomposition means eating at roughly maintenance to slowly swap fat for muscle. Non-body-comp goals are referred to professionals.",
+  },
+  bmi: {
+    term: 'BMI — Body Mass Index',
+    text: "A rough measure of body size based only on your height and weight. Useful as a quick screening number, but it can't tell muscle from fat — a very muscular person will often score 'overweight' by BMI even if they're lean. We use it as one input, not as a verdict.",
+  },
+  bodyFat: {
+    term: 'Body Fat %',
+    text: "What percentage of your total bodyweight is fat. The rest — muscle, bone, organs, water — is lean mass. Lower isn't always better: your body needs some fat for hormones and organ protection. The healthy range differs by sex and age.",
+  },
+  fatMass: {
+    term: 'Fat Mass',
+    text: "The actual weight of the fat in your body. When you 'lose fat', this is the number that drops — not just the scale, which can swing up or down with water and muscle too.",
+  },
+  leanMass: {
+    term: 'Lean Mass (LBM)',
+    text: "Everything in your body that isn't fat — muscles, bones, organs, and water. Protecting this matters because muscle burns more calories at rest, keeps you strong, and shapes how you look at any weight. Your plan is built around preserving it.",
+  },
+  ffmi: {
+    term: 'FFMI — Fat-Free Mass Index',
+    text: "A measure of how much muscle you carry relative to your height, with body fat taken out of the equation. Think of it as a muscularity score. The average is around 18–19 for men and 15–16 for women. It tells us how much room you have to grow.",
+  },
+  build: {
+    term: 'Build',
+    text: "A plain-language description of your overall body composition based on your lean mass and fat levels. Two people at the same weight can have very different builds — this gives your plan a more useful starting picture than a single number.",
+  },
+  bfMethod: {
+    term: 'Body Fat Estimation Method',
+    text: "How we calculated your body fat percentage. The Navy method uses neck, waist, and hip measurements and is the most accurate non-scan approach available. If those weren't provided, we used a formula based on BMI — less precise, but still useful as a direction.",
+  },
+  bmr: {
+    term: 'BMR — Basal Metabolic Rate',
+    text: "The calories your body burns just to stay alive — even if you lay in bed all day. This covers breathing, keeping your heart beating, and running your organs. Think of it as your body's minimum fuel cost before any movement.",
+  },
+  tdee: {
+    term: 'TDEE — Total Daily Energy Expenditure',
+    text: "The total calories you burn in a day, including activity. Eat exactly this and your weight holds steady. Eat less and you lose weight. Eat more and you gain. Everything in your nutrition plan is built around this number.",
+  },
+  calorieTarget: {
+    term: 'Calorie Target',
+    text: "The daily calories we recommend you eat to reach your goal. It's your maintenance (TDEE) adjusted up or down depending on whether you're trying to lose fat or build muscle. A starting estimate — it sharpens after a week of real data.",
+  },
+  vsMaintenance: {
+    term: 'vs Maintenance',
+    text: "How much above or below your maintenance this target sits. A deficit means your body draws on stored fat for energy — that's fat loss. A surplus gives it extra fuel to build muscle. Zero means your weight is expected to hold steady.",
+  },
+  protein: {
+    term: 'Protein',
+    text: "The most important number in your plan. Protein builds and repairs muscle, and it's the only macro that can't be substituted when your body runs low. Without enough, especially during a deficit, your body starts breaking down muscle for fuel. Hit this number before worrying about anything else.",
+  },
+  carbs: {
+    term: 'Carbohydrates',
+    text: "Your body's preferred fuel — especially for intense exercise. Carbs are stored in muscles as glycogen and burned first during workouts. They also power your brain. Once protein and fat are accounted for, the remaining calories go here.",
+  },
+  fats: {
+    term: 'Dietary Fats',
+    text: "Essential for hormone production, vitamin absorption, and brain function. Don't cut these too low — dropping below around 0.3–0.4 g per kg of bodyweight can disrupt hormones and mood. We set them at 25% of your calories, which is a solid healthy baseline.",
+  },
+};
+
+// ─── Display helpers ──────────────────────────────────────────────────────────
 
 const ACTIVITY_LABELS: Record<string, string> = {
-  sedentary: 'sedentary',
-  light: 'lightly active',
-  moderate: 'moderately active',
-  active: 'very active',
-  extreme: 'athlete-level active',
+  sedentary: 'Sedentary',
+  light: 'Lightly Active',
+  moderate: 'Moderately Active',
+  active: 'Very Active',
+  extreme: 'Athlete-Level',
 };
 
-const ACTIVITY_MULTIPLIERS: Record<string, number> = {
-  sedentary: 1.2,
-  light: 1.375,
-  moderate: 1.55,
-  active: 1.725,
-  extreme: 1.9,
+const GOAL_TYPE_LABELS: Record<string, string> = {
+  'fat-loss': 'Fat Loss',
+  'muscle-gain': 'Muscle Gain',
+  'recomp': 'Recomposition',
+  'non-body-comp-minor': 'Posture / Minor',
+  'non-body-comp-major': 'Rehabilitation',
 };
 
-// ─── Section types ────────────────────────────────────────────────────────────
+const SEX_LABELS: Record<string, string> = { male: 'Male', female: 'Female', other: 'Other' };
 
-interface Section {
-  icon: string;
+function fmt(n: number | undefined, unit = '', decimals = 1): string {
+  if (n === undefined || n === null) return '—';
+  return `${Number(n).toFixed(decimals)}${unit ? ' ' + unit : ''}`;
+}
+
+function fmtInt(n: number | undefined, unit = ''): string {
+  if (n === undefined || n === null) return '—';
+  return `${Math.round(n)}${unit ? ' ' + unit : ''}`;
+}
+
+// ─── Row ─────────────────────────────────────────────────────────────────────
+
+type RowProps = {
+  label: string;
+  value: string;
+  accent?: string;
+  info?: InfoEntry;
+  onInfo?: (entry: InfoEntry) => void;
+};
+
+function Row({ label, value, accent, info, onInfo }: RowProps) {
+  return (
+    <View style={styles.row}>
+      <View style={styles.rowLeft}>
+        <Text style={styles.rowLabel}>{label}</Text>
+        {info && onInfo && (
+          <TouchableOpacity
+            onPress={() => onInfo(info)}
+            hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+            style={styles.infoBtn}
+          >
+            <Ionicons name="information-circle-outline" size={14} color={colors.text.disabled} />
+          </TouchableOpacity>
+        )}
+      </View>
+      <Text style={[styles.rowValue, accent ? { color: accent } : null]} numberOfLines={3}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+// ─── Section ─────────────────────────────────────────────────────────────────
+
+function Section({
+  icon,
+  iconColor,
+  title,
+  children,
+  anim,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
   iconColor: string;
   title: string;
-  lines: { label?: string; value: string; accent?: boolean }[];
-  note?: string;
+  children: React.ReactNode;
+  anim: Animated.Value;
+}) {
+  return (
+    <Animated.View
+      style={[
+        styles.section,
+        {
+          opacity: anim,
+          transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
+        },
+      ]}
+    >
+      <View style={styles.sectionHeader}>
+        <View style={[styles.iconWrap, { backgroundColor: iconColor + '20' }]}>
+          <Ionicons name={icon} size={16} color={iconColor} />
+        </View>
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+      <View style={styles.rows}>{children}</View>
+    </Animated.View>
+  );
+}
+
+// ─── Info Modal ───────────────────────────────────────────────────────────────
+
+function InfoModal({
+  entry,
+  onClose,
+  bottomInset,
+}: {
+  entry: InfoEntry | null;
+  onClose: () => void;
+  bottomInset: number;
+}) {
+  return (
+    <Modal
+      visible={entry !== null}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={modal.backdrop} />
+      </TouchableWithoutFeedback>
+
+      <View style={[modal.sheet, { paddingBottom: bottomInset + spacing.lg }]}>
+        {/* Handle */}
+        <View style={modal.handle} />
+
+        {/* Header */}
+        <View style={modal.header}>
+          <View style={modal.termIcon}>
+            <Ionicons name="information-circle" size={20} color={colors.primary} />
+          </View>
+          <Text style={modal.term}>{entry?.term}</Text>
+        </View>
+
+        {/* Explanation */}
+        <Text style={modal.text}>{entry?.text}</Text>
+
+        {/* CTA */}
+        <TouchableOpacity style={modal.btn} onPress={onClose} activeOpacity={0.8}>
+          <Text style={modal.btnText}>Got it</Text>
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  );
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export function StatsRevealScreen({ navigation, route }: Props) {
-  const { stats } = route.params;
+export function StatsRevealScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const calcs = computeBodyStats(stats);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [calcs, setCalcs] = useState<BodyCompositionStats | null>(null);
+  const [activeInfo, setActiveInfo] = useState<InfoEntry | null>(null);
 
-  const multiplier = ACTIVITY_MULTIPLIERS[stats.activityLevel] ?? 1.55;
-  const activityLabel = ACTIVITY_LABELS[stats.activityLevel] ?? stats.activityLevel;
-  const methodLabel = calcs.estimationMethod === 'navy'
-    ? 'the US Navy circumference method'
-    : 'the Deurenberg BMI formula';
-  const methodAccuracy = calcs.estimationMethod === 'navy'
-    ? '±3–4% on honest measurements'
-    : '±5–7% — less precise, but workable';
-
-  // Sections derived from actual stats
-  const sections: Section[] = [
-    {
-      icon: 'flame-outline',
-      iconColor: colors.primaryLight,
-      title: 'Why your maintenance is ~' + calcs.tdee + ' kcal',
-      lines: [
-        {
-          label: 'Step 1 — Basal Metabolic Rate',
-          value: `Your body burns ${calcs.bmr} kcal just existing — lying still, breathing, keeping organs running. This was calculated using the Mifflin-St Jeor formula: 10 × weight + 6.25 × height − 5 × age${stats.sex === 'male' ? ' + 5' : ' − 161'}.`,
-        },
-        {
-          label: 'Step 2 — Activity multiplier',
-          value: `You described yourself as ${activityLabel}. That maps to a multiplier of ${multiplier}x. ${calcs.bmr} × ${multiplier} = ${calcs.tdee} kcal.`,
-          accent: true,
-        },
-        {
-          label: 'What this means',
-          value: `Eat less than ${calcs.tdee} kcal and you lose weight. Eat more and you gain. The distance between these two determines everything — how fast, how sustainable, and what you retain.`,
-        },
-      ],
-      note: 'The activity multiplier is the shakiest part of this equation. Most people overestimate how active they are. If the plan feels off after a few weeks, this is the first number we revisit.',
-    },
-    {
-      icon: 'body-outline',
-      iconColor: calcs.bfColor === 'success' ? colors.success : calcs.bfColor === 'gold' ? colors.gold : colors.danger,
-      title: 'Why your body fat is ~' + calcs.bfPercent + '%',
-      lines: [
-        {
-          label: 'Method used',
-          value: `Your body fat was estimated using ${methodLabel}. Accuracy: ${methodAccuracy}.`,
-        },
-        ...(calcs.estimationMethod === 'navy'
-          ? [
-              {
-                label: 'How it works',
-                value: `The Navy method uses neck, waist${stats.sex !== 'male' ? ', and hip' : ''} circumferences plugged into a log formula. It's the most accurate non-scan method available without a lab. Small measurement errors compound — a 1 cm mistake shifts the result by ~1%.`,
-              },
-            ]
-          : [
-              {
-                label: "Why it's less precise",
-                value: `Without neck and waist measurements, we fell back to the Deurenberg BMI formula. BMI doesn't distinguish muscle from fat — two people at the same BMI can have very different body compositions. Treat this as a directional estimate only.`,
-              },
-            ]),
-        {
-          label: 'What your number means',
-          value: `${calcs.bfPercent}% puts you in the ${calcs.bfCategory.toLowerCase()} range. ${
-            calcs.bfCategory === 'Athletic'
-              ? "You're already lean. The aesthetic gains from here come from adding muscle, not losing more fat."
-              : calcs.bfCategory === 'Fit'
-              ? "You're in good shape. Small improvements here have outsized visual impact."
-              : calcs.bfCategory === 'Average'
-              ? "There's meaningful room to improve. The good news: you'll see visible changes relatively quickly."
-              : "There's a lot of room to improve, and the results will be dramatic. Early progress tends to be the fastest."
-          }`,
-          accent: true,
-        },
-      ],
-    },
-    {
-      icon: 'barbell-outline',
-      iconColor: colors.info,
-      title: 'Your ' + calcs.lbmKg + ' kg lean mass — what it is and why it matters',
-      lines: [
-        {
-          label: 'What it is',
-          value: `Lean body mass is everything that isn't fat — muscle, bone, organs, water, connective tissue. Yours is ${calcs.lbmKg} kg out of ${stats.weightKg} kg total.`,
-        },
-        {
-          label: 'Why the plan protects it',
-          value: `When you lose weight, you want to lose fat. In practice, hard cuts without enough protein and training also consume muscle. Every program here is designed to preserve your ${calcs.lbmKg} kg while reducing the ${calcs.fatMassKg} kg of fat.`,
-        },
-        {
-          label: 'FFMI: ' + calcs.ffmi,
-          value: `Your Fat-Free Mass Index — lean mass relative to height — is ${calcs.ffmi}. This gives us a measure of your muscular development independent of how lean or heavy you are. Average is around 18–19 for men, 15–16 for women. It shapes the build target in your plan.`,
-          accent: true,
-        },
-      ],
-    },
-    {
-      icon: 'alert-circle-outline',
-      iconColor: colors.gold,
-      title: 'The honest part: these are educated starting points',
-      lines: [
-        {
-          value: `Every number on this screen is an estimate. A well-calibrated and science backed estimate — but an estimate. Body fat formulas have inherent error margins. And your daily activity "sedentary" and "light" or whatever is too rough and general. Your metabolism may run slightly hotter or cooler than the formula predicts.`,
-        },
-        {
-          label: 'How you calibrate them',
-          value: `But Gymman has a solution for you. Just log your daily weight in the app early morning before you eat anything. Use the Calory Burn section in the app to track your actual daily activity level. Log what you eat, log your workouts. Everything is easy and simple in our app. Real numbers emerge from real data. After 3–4 weeks of logging honest food intake and tracking your weight daily, we at Gymman would automatically change your data to the real data. Then, it won't be mere estimates. It will be data backed strategy.`,
-          accent: true,
-        },
-        {
-          label: 'What never changes',
-          value: `The direction is never wrong. Whether your maintenance is ${calcs.tdee - 80} or ${calcs.tdee + 80} kcal, the principles are identical. You eat at a deficit to lose fat, a surplus to build muscle, and you protect lean mass either way. And Gymman will always tell you what to do to reach your goal. If confused, just ask Gymman. We have an In-Built 24/7 coach for that very reason.`,
-        },
-      ],
-      note: 'Think of the first week as data collection, not just execution. The more honestly you log, the faster the numbers become truly yours.',
-    },
-    {
-      icon: 'trending-up-outline',
-      iconColor: colors.success,
-      title: 'What gets sharper over time',
-      lines: [
-        {
-          value: `Week 1–2: Baseline is set. The app tracks everything about you, and creates your completely realistic numbers and plans.`,
-        },
-        {
-          value: `Week 3–4: Weight trend emerges. If you're losing ~0.5 kg/week on a 500 kcal deficit, the numbers are accurate. If not — we recalibrate. The app always does a weekly check, so forever, our algorithm will keep becoming better at working for you.`,
-          accent: true,
-        },
-        {
-          value: `Month 2+: You stop using the formula. Your logged history becomes the data source. Now, Gymman knows you better than you do yourself. And it will help you reach that fitness goal. By hook or by crook.`,
-        },
-        {
-          label: 'The goal',
-          value: `A coach's job in session 1 is to build the best possible starting model with the information available. That's what these numbers are. The model gets better. You get sharper. The plan will evolve with you.`,
-          accent: true,
-        },
-      ],
-    },
-  ];
-
-  // Staggered entrance animations
-  const sectionAnims = useRef(sections.map(() => new Animated.Value(0))).current;
+  const anims = useRef(Array.from({ length: 5 }, () => new Animated.Value(0))).current;
 
   useEffect(() => {
-    const anims = sectionAnims.map((anim, i) =>
-      Animated.timing(anim, {
-        toValue: 1,
-        duration: 320,
-        delay: 100 + i * 100,
-        useNativeDriver: true,
-      }),
-    );
-    Animated.parallel(anims).start();
+    loadUserProfile().then(async p => {
+      if (!p) return;
+      const s = profileToStats(p);
+      const c = computeBodyStats(s);
+      // Compute and persist nutrition values if GoalAnalysis hasn't run yet
+      if (!p.calorieTarget) {
+        const goalType = classifyGoal(p.goalText, c.bfPercent, s.sex);
+        const calorieTarget = calcCalorieTarget(c.tdee, goalType);
+        const { proteinG, fatsG, carbsG } = calcMacros(calorieTarget, c.lbmKg, goalType);
+        const patch = {
+          bmr: c.bmr, tdee: c.tdee, bfPercent: c.bfPercent,
+          fatMassKg: c.fatMassKg, lbmKg: c.lbmKg,
+          goalType, calorieTarget, proteinG, carbsG, fatsG,
+          goalOffset: calorieTarget - c.tdee,
+        };
+        await saveUserProfile(patch);
+        p = { ...p, ...patch };
+      }
+      setProfile(p);
+      setCalcs(c);
+    });
   }, []);
+
+  useEffect(() => {
+    if (!profile || !calcs) return;
+    Animated.parallel(
+      anims.map((anim, i) =>
+        Animated.timing(anim, { toValue: 1, duration: 300, delay: i * 80, useNativeDriver: true }),
+      ),
+    ).start();
+  }, [profile, calcs]);
+
+  if (!profile || !calcs) {
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  const bfAccent =
+    calcs.bfColor === 'success' ? colors.success
+    : calcs.bfColor === 'gold' ? colors.gold
+    : colors.danger;
+
+  const goalOffset = profile.goalOffset;
+  const offsetLabel =
+    goalOffset === undefined ? '—'
+    : goalOffset === 0 ? '0 kcal (maintenance)'
+    : goalOffset > 0 ? `+${goalOffset} kcal (surplus)`
+    : `${goalOffset} kcal (deficit)`;
+
+  const i = (key: string) => ({
+    info: INFOS[key],
+    onInfo: setActiveInfo,
+  });
 
   return (
     <View style={styles.root}>
@@ -215,7 +326,7 @@ export function StatsRevealScreen({ navigation, route }: Props) {
         >
           <Ionicons name="chevron-back" size={24} color={colors.text.secondary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Behind the Numbers</Text>
+        <Text style={styles.headerTitle}>Your Stats</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -223,85 +334,122 @@ export function StatsRevealScreen({ navigation, route }: Props) {
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero */}
-        <View style={styles.hero}>
-          <Text style={styles.heroTitle}>Here's how the coach thinks.</Text>
-          <Text style={styles.heroSub}>
-            Every number we showed you came from somewhere. This is the reasoning — the formulas, the assumptions, and where the estimates still have room to sharpen.
-          </Text>
-        </View>
 
-        {/* Sections */}
-        <View style={styles.sectionList}>
-          {sections.map((section, si) => (
-            <Animated.View
-              key={si}
-              style={{
-                opacity: sectionAnims[si],
-                transform: [
-                  {
-                    translateY: sectionAnims[si].interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [16, 0],
-                    }),
-                  },
-                ],
-              }}
-            >
-              <View style={styles.sectionCard}>
-                {/* Section header */}
-                <View style={styles.sectionHeader}>
-                  <View style={[styles.iconWrap, { backgroundColor: section.iconColor + '20' }]}>
-                    <Ionicons name={section.icon as any} size={18} color={section.iconColor} />
-                  </View>
-                  <Text style={styles.sectionTitle}>{section.title}</Text>
-                </View>
+        {/* ── Section 1: Personal ──────────────────────────────────────────── */}
+        <Section icon="person-outline" iconColor={colors.primaryLight} title="Personal" anim={anims[0]}>
+          <Row label="Name"    value={profile.name} />
+          <Row label="Age"     value={`${profile.age} years`} />
+          <Row label="Sex"     value={SEX_LABELS[profile.sex] ?? profile.sex} />
+          {profile.neckCm  && <Row label="Neck"  value={fmt(profile.neckCm, 'cm')}  {...i('measurements')} />}
+          {profile.waistCm && <Row label="Waist" value={fmt(profile.waistCm, 'cm')} {...i('measurements')} />}
+          {profile.hipCm   && <Row label="Hip"   value={fmt(profile.hipCm, 'cm')}   {...i('measurements')} />}
+          <Row label="Country" value={profile.country} />
+          <Row label="Dietary" value={profile.dietary} />
+        </Section>
 
-                {/* Lines */}
-                <View style={styles.lineList}>
-                  {section.lines.map((line, li) => (
-                    <View
-                      key={li}
-                      style={[
-                        styles.line,
-                        line.accent && styles.lineAccent,
-                        li > 0 && styles.lineWithDivider,
-                      ]}
-                    >
-                      {line.label && (
-                        <Text style={styles.lineLabel}>{line.label}</Text>
-                      )}
-                      <Text style={[styles.lineValue, line.accent && styles.lineValueAccent]}>
-                        {line.value}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
+        {/* ── Section 2: Body Composition ──────────────────────────────────── */}
+        <Section icon="body-outline" iconColor={colors.gold} title="Body Composition" anim={anims[1]}>
+          <Row label="Weight"    value={fmt(profile.weightKg, 'kg')} />
+          <Row label="Height"    value={fmtInt(profile.heightCm, 'cm')} />
+          <Row label="BMI"       value={fmt(calcs.bmi)}                                                    {...i('bmi')} />
+          <Row label="Body Fat"  value={`${fmt(calcs.bfPercent)}%  (${calcs.bfCategory})`} accent={bfAccent} {...i('bodyFat')} />
+          <Row label="Fat Mass"  value={fmt(calcs.fatMassKg, 'kg')}                                        {...i('fatMass')} />
+          <Row label="Lean Mass" value={fmt(calcs.lbmKg, 'kg')} accent={colors.success}                   {...i('leanMass')} />
+          <Row label="FFMI"      value={fmt(calcs.ffmi)}                                                   {...i('ffmi')} />
+          <Row label="Build"     value={calcs.buildDescription}                                            {...i('build')} />
+          <Row label="BF Method" value={calcs.estimationMethod === 'navy' ? 'US Navy (circumference)' : 'Deurenberg (BMI-based)'} {...i('bfMethod')} />
+        </Section>
 
-                {/* Footer note */}
-                {section.note && (
-                  <View style={styles.noteRow}>
-                    <Ionicons name="information-circle-outline" size={14} color={colors.text.muted} />
-                    <Text style={styles.noteText}>{section.note}</Text>
-                  </View>
-                )}
-              </View>
-            </Animated.View>
-          ))}
-        </View>
+        {/* ── Section 4: Nutrition Plan ────────────────────────────────────── */}
+        <Section icon="nutrition-outline" iconColor={colors.success} title="Nutrition Plan" anim={anims[2]}>
+          <Row label="BMR"            value={fmtInt(calcs.bmr, 'kcal')}              {...i('bmr')} />
+          <Row label="TDEE"           value={fmtInt(calcs.tdee, 'kcal')}             {...i('tdee')} />
+          <Row label="Calorie Target" value={fmtInt(profile.calorieTarget, 'kcal')} accent={colors.primary} {...i('calorieTarget')} />
+          <Row label="vs Maintenance" value={offsetLabel}                             {...i('vsMaintenance')} />
+          <Row label="Protein"        value={fmtInt(profile.proteinG, 'g')} accent={colors.info}  {...i('protein')} />
+          <Row label="Carbs"          value={fmtInt(profile.carbsG, 'g')}            {...i('carbs')} />
+          <Row label="Fats"           value={fmtInt(profile.fatsG, 'g')}             {...i('fats')} />
+          {profile.targetWeightKg && (
+            <Row label="Target Weight" value={fmt(profile.targetWeightKg, 'kg')} accent={colors.success} />
+          )}
+        </Section>
+
+        {/* ── Section 5: Lifestyle & Goal ──────────────────────────────────── */}
+        <Section icon="leaf-outline" iconColor={colors.info} title="Lifestyle & Goal" anim={anims[3]}>
+          <Row label="Activity Level" value={ACTIVITY_LABELS[profile.activityLevel] ?? profile.activityLevel} {...i('activityLevel')} />
+          {profile.activityDescription && (
+            <Row label="How you described it" value={profile.activityDescription} />
+          )}
+          <Row label="Goal" value={profile.goalText} />
+          {profile.goalType && (
+            <Row
+              label="Classified As"
+              value={GOAL_TYPE_LABELS[profile.goalType] ?? profile.goalType}
+              accent={colors.primary}
+              {...i('goalType')}
+            />
+          )}
+          {(() => {
+            const goalType = profile.goalType ?? 'recomp';
+            const target = profile.targetWeightKg;
+            const lbm = calcs.lbmKg;
+            const fat = calcs.fatMassKg;
+
+            const fatToLose =
+              (goalType === 'fat-loss' && target)
+                ? Math.max(0, Math.round((fat - (target - lbm)) * 10) / 10)
+                : null;
+
+            const muscleToGain =
+              (goalType === 'muscle-gain' && target)
+                ? Math.max(0, Math.round(((target - fat) - lbm) * 10) / 10)
+                : null;
+
+            return (
+              <>
+                <Row
+                  label="Fat to Lose"
+                  value={
+                    fatToLose !== null
+                      ? `${fatToLose} kg to go`
+                      : "You don't need to lose fat right now"
+                  }
+                  accent={fatToLose ? colors.danger : colors.text.muted}
+                />
+                <Row
+                  label="Muscle to Gain"
+                  value={
+                    muscleToGain !== null
+                      ? `${muscleToGain} kg to go`
+                      : "Not your primary focus right now"
+                  }
+                  accent={muscleToGain ? colors.success : colors.text.muted}
+                />
+              </>
+            );
+          })()}
+        </Section>
+
       </ScrollView>
 
       {/* Footer */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
         <TouchableOpacity
           style={styles.continueBtn}
-          onPress={() => navigation.navigate('GoalAnalysis', { stats, goalText: route.params.goalText, startOnAnalysis: true })}
+          onPress={() => navigation.navigate('GoalAnalysis')}
           activeOpacity={0.85}
         >
           <Text style={styles.continueBtnText}>Analyse my goal</Text>
           <Ionicons name="arrow-forward" size={18} color={colors.text.inverse} style={{ marginLeft: 6 }} />
         </TouchableOpacity>
       </View>
+
+      {/* Info modal */}
+      <InfoModal
+        entry={activeInfo}
+        onClose={() => setActiveInfo(null)}
+        bottomInset={insets.bottom}
+      />
     </View>
   );
 }
@@ -309,9 +457,13 @@ export function StatsRevealScreen({ navigation, route }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: {
+  root: { flex: 1, backgroundColor: colors.bg.app },
+
+  loader: {
     flex: 1,
     backgroundColor: colors.bg.app,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   header: {
@@ -323,113 +475,82 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border.subtle,
   },
-  headerTitle: {
-    ...typography.subhead,
-    color: colors.text.secondary,
-  },
+  headerTitle: { ...typography.subhead, color: colors.text.secondary },
 
   scroll: {
     paddingHorizontal: spacing.screenPadding,
-    paddingTop: spacing.xl,
-  },
-
-  hero: {
-    gap: spacing.sm,
-    marginBottom: spacing.xl,
-  },
-  heroTitle: {
-    ...typography.title1,
-    color: colors.text.primary,
-  },
-  heroSub: {
-    ...typography.callout,
-    color: colors.text.secondary,
-    lineHeight: 23,
-  },
-
-  sectionList: {
+    paddingTop: spacing.lg,
     gap: spacing.md,
   },
 
-  sectionCard: {
+  // ── Section card ─────────────────────────────────────────────────────────────
+  section: {
     backgroundColor: colors.bg.card,
     borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border.default,
-    padding: spacing.md,
-    gap: spacing.md,
+    overflow: 'hidden',
+    marginBottom: spacing.md,
   },
-
   sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border.subtle,
+    backgroundColor: colors.bg.elevated,
   },
   iconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.md,
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
-    marginTop: 1,
   },
   sectionTitle: {
     ...typography.subhead,
     color: colors.text.primary,
     fontWeight: '600',
-    flex: 1,
-    lineHeight: 20,
+    letterSpacing: 0.1,
   },
 
-  lineList: {
-    gap: 0,
-  },
-  line: {
-    gap: 4,
-    paddingVertical: spacing.sm,
-  },
-  lineWithDivider: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border.subtle,
-  },
-  lineAccent: {
-    backgroundColor: colors.bg.elevated,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.sm,
-    marginHorizontal: -spacing.sm,
-  },
-  lineLabel: {
-    ...typography.caption,
-    color: colors.text.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  lineValue: {
-    ...typography.callout,
-    color: colors.text.secondary,
-    lineHeight: 22,
-  },
-  lineValueAccent: {
-    color: colors.text.primary,
-  },
-
-  noteRow: {
+  // ── Rows ─────────────────────────────────────────────────────────────────────
+  rows: {},
+  row: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'flex-start',
-    paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border.subtle,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 11,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border.subtle,
+    gap: spacing.md,
   },
-  noteText: {
-    ...typography.footnote,
+  rowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexShrink: 0,
+  },
+  rowLabel: {
+    ...typography.callout,
     color: colors.text.muted,
+  },
+  infoBtn: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rowValue: {
+    ...typography.callout,
+    color: colors.text.primary,
+    fontWeight: '500',
+    textAlign: 'right',
     flex: 1,
-    lineHeight: 18,
-    fontStyle: 'italic',
   },
 
+  // ── Footer ───────────────────────────────────────────────────────────────────
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -449,7 +570,68 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
   },
-  continueBtnText: {
+  continueBtnText: { ...typography.bodyMedium, color: colors.text.inverse },
+});
+
+// ─── Modal styles ─────────────────────────────────────────────────────────────
+
+const modal = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  sheet: {
+    backgroundColor: colors.bg.card,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingHorizontal: spacing.screenPadding,
+    paddingTop: spacing.sm,
+    gap: spacing.md,
+    borderTopWidth: 1,
+    borderColor: colors.border.default,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border.default,
+    alignSelf: 'center',
+    marginBottom: spacing.xs,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  termIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary + '18',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  term: {
+    ...typography.subhead,
+    color: colors.text.primary,
+    fontWeight: '600',
+    flex: 1,
+    lineHeight: 20,
+  },
+  text: {
+    ...typography.callout,
+    color: colors.text.secondary,
+    lineHeight: 23,
+  },
+  btn: {
+    height: spacing.buttonHeight,
+    backgroundColor: colors.primary,
+    borderRadius: radius.button,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnText: {
     ...typography.bodyMedium,
     color: colors.text.inverse,
   },

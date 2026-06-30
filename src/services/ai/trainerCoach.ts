@@ -1,6 +1,5 @@
 import { groqChat, type ChatMessage } from './client';
-import type { Routine, RoutineDay, Exercise } from '@/types/routine';
-import type { WorkoutLog } from '@/types/workoutLog';
+import type { Routine, RoutineDay, Exercise, WorkoutLog } from '@/types/plan';
 
 // ─── Patch types ──────────────────────────────────────────────────────────────
 

@@ -1,5 +1,9 @@
 import { groqChat, type ChatMessage } from './client';
 import type { UserPhysicalStats, QuestionKey } from '@/modules/onboarding/utils/physicalStatsParser';
+import {
+  extractName, extractAge, extractWeight, extractHeight,
+  extractNeck, extractWaist, extractHip, estimateActivityLevel,
+} from '@/modules/onboarding/utils/physicalStatsParser';
 
 export type OnboardingAction = 'proceed' | 'skip' | 'off-topic' | 'unclear' | 'correction';
 
@@ -32,6 +36,82 @@ function summarizeCollected(c: Partial<UserPhysicalStats>): string {
     c.dietary       && `Dietary: ${c.dietary}`,
     c.activityLevel && `Activity: ${ACTIVITY_LABELS[c.activityLevel]}`,
   ].filter(Boolean).join('\n') || '(none yet)';
+}
+
+// ─── Local fallback (used when the API is unavailable or rate-limited) ────────
+
+function nextAfterMeasurement(q: 'neck' | 'waist' | 'hip', sex?: string): QuestionKey {
+  if (q === 'neck') return 'waist';
+  if (q === 'waist') return (sex === 'female' || sex === 'other') ? 'hip' : 'country';
+  return 'country';
+}
+
+function localFallback({
+  currentQ,
+  collected,
+  userRaw,
+}: {
+  currentQ: QuestionKey;
+  collected: Partial<UserPhysicalStats>;
+  userRaw: string;
+}): OnboardingChatResult | null {
+  switch (currentQ) {
+    case 'name': {
+      const name = extractName(userRaw);
+      if (name) return { action: 'proceed', reply: `Hey ${name}!`, collected: { name }, next: 'age' };
+      return null;
+    }
+    case 'age': {
+      const age = extractAge(userRaw);
+      if (age !== null) return { action: 'proceed', reply: 'Got it.', collected: { age }, next: 'sex' };
+      return null;
+    }
+    case 'weight': {
+      const w = extractWeight(userRaw);
+      if (w) return { action: 'proceed', reply: `Noted — ${w.display}.`, collected: { weightKg: w.kg }, next: 'height' };
+      return null;
+    }
+    case 'height': {
+      const h = extractHeight(userRaw);
+      if (h) return { action: 'proceed', reply: `Got it — ${h.display}.`, collected: { heightCm: h.cm }, next: 'neck' };
+      return null;
+    }
+    case 'neck': {
+      const v = extractNeck(userRaw);
+      if (v === 'skip') return { action: 'skip', reply: 'No problem.', next: 'waist' };
+      if (v !== null) return { action: 'proceed', reply: 'Got it.', collected: { neckCm: v }, next: 'waist' };
+      return null;
+    }
+    case 'waist': {
+      const v = extractWaist(userRaw);
+      const next = nextAfterMeasurement('waist', collected.sex);
+      if (v === 'skip') return { action: 'skip', reply: 'No problem.', next };
+      if (v !== null) return { action: 'proceed', reply: 'Got it.', collected: { waistCm: v }, next };
+      return null;
+    }
+    case 'hip': {
+      const v = extractHip(userRaw);
+      if (v === 'skip') return { action: 'skip', reply: 'No problem.', next: 'country' };
+      if (v !== null) return { action: 'proceed', reply: 'Got it.', collected: { hipCm: v }, next: 'country' };
+      return null;
+    }
+    case 'country': {
+      const t = userRaw.trim();
+      if (t.length >= 2) return { action: 'proceed', reply: 'Got it.', collected: { country: t }, next: 'dietary' };
+      return null;
+    }
+    case 'dietary': {
+      const t = userRaw.trim();
+      if (t.length >= 1) return { action: 'proceed', reply: 'Almost done — just need to know how active you are.', collected: { dietary: t }, next: 'activityLevel' };
+      return null;
+    }
+    case 'activityDescription': {
+      const level = estimateActivityLevel(userRaw);
+      return { action: 'proceed', reply: 'Got it.', collected: { activityLevel: level }, next: 'done' };
+    }
+    default:
+      return null;
+  }
 }
 
 export async function onboardingChat({
@@ -121,8 +201,9 @@ Genuine but ambiguous attempt:
       { role: 'user', content: `User replied: "${userRaw}"\n\nReturn the JSON response.` },
     ]);
   } catch (err) {
-    console.error('[onboardingChat] API call failed:', err);
-    throw err;
+    console.warn('[onboardingChat] API unavailable, trying local fallback:', err);
+    return localFallback({ currentQ, collected, userRaw })
+      ?? { action: 'unclear', reply: "Could you be a bit more specific? I want to make sure I get this right." };
   }
 
   try {
@@ -132,7 +213,7 @@ Genuine but ambiguous attempt:
     return JSON.parse(cleaned) as OnboardingChatResult;
   } catch (err) {
     console.error('[onboardingChat] JSON parse failed. Raw model output:\n', raw);
-    console.error(err);
-    return { action: 'unclear', reply: "I didn't quite catch that — could you try again?" };
+    return localFallback({ currentQ, collected, userRaw })
+      ?? { action: 'unclear', reply: "I didn't quite catch that — could you try again?" };
   }
 }
