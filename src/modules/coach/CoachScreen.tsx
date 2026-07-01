@@ -24,15 +24,17 @@ import { Ionicons }         from '@expo/vector-icons';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { MainTabParamList }     from '@/app/navigation/types';
 
-import { ChatView }          from './components/ChatView';
-import type { DisplayMessage } from './components/ChatView';
+import { ChatView }            from './components/ChatView';
+import type { DisplayMessage }  from './components/ChatView';
+import { ChatHistoryPanel }    from './components/ChatHistoryPanel';
 
 import { masterCoachChat }     from '@/services/ai/masterCoach';
 import type { MasterAction }   from '@/services/ai/masterCoach';
 
 import {
   isCoachOnboarded, setCoachOnboarded,
-  loadMasterChats, saveMasterChat, getActiveChatId, setActiveChatId,
+  loadMasterChats, saveMasterChat, deleteMasterChat,
+  getActiveChatId, setActiveChatId,
   createMasterChat,
   type MasterChat,
 } from '@/services/storage/local/masterChatStorage';
@@ -108,9 +110,11 @@ export function CoachScreen(_: Props) {
   const insets = useSafeAreaInsets();
 
   // Boot state
-  const [bootDone,   setBootDone]   = useState(false);
-  const [onboarded,  setOnboarded]  = useState(false);
-  const [session,    setSession]    = useState<MasterChat | null>(null);
+  const [bootDone,     setBootDone]     = useState(false);
+  const [onboarded,    setOnboarded]    = useState(false);
+  const [session,      setSession]      = useState<MasterChat | null>(null);
+  const [chats,        setChats]        = useState<MasterChat[]>([]);
+  const [historyOpen,  setHistoryOpen]  = useState(false);
 
   // Action side-effect state
   const [dietLog,          setDietLog]          = useState<LogItem[]>([]);
@@ -121,7 +125,7 @@ export function CoachScreen(_: Props) {
   // ── Boot: load everything in parallel ──────────────────────────────────────
   useEffect(() => {
     (async () => {
-      const [ob, chats, activeId, log, acts, routines] = await Promise.all([
+      const [ob, loadedChats, activeId, log, acts, routines] = await Promise.all([
         isCoachOnboarded(),
         loadMasterChats(),
         getActiveChatId(),
@@ -133,6 +137,7 @@ export function CoachScreen(_: Props) {
       setDietLog(log);
       setTodayActivities(acts);
       setOnboarded(ob);
+      setChats(loadedChats);
 
       // Today's routine day for workout logging
       const routine  = routines[routines.length - 1];
@@ -141,7 +146,7 @@ export function CoachScreen(_: Props) {
       setTodayRoutineDay(todayDay);
 
       if (ob) {
-        const active = activeId ? chats.find(c => c.id === activeId) ?? null : null;
+        const active = activeId ? loadedChats.find(c => c.id === activeId) ?? null : null;
         const s      = active ?? createMasterChat();
         if (!active) {
           await saveMasterChat(s);
@@ -160,6 +165,7 @@ export function CoachScreen(_: Props) {
     const s = createMasterChat();
     await saveMasterChat(s);
     await setActiveChatId(s.id);
+    setChats([s]);
     setSession(s);
     setOnboarded(true);
   }, []);
@@ -169,6 +175,7 @@ export function CoachScreen(_: Props) {
     const s = createMasterChat();
     await saveMasterChat(s);
     await setActiveChatId(s.id);
+    setChats(prev => [s, ...prev]);
     setSession(s);
     setPendingWorkout(null);
   }, []);
@@ -183,8 +190,38 @@ export function CoachScreen(_: Props) {
         .map(m => ({ id: m.id, role: m.role as 'user' | 'assistant', content: m.content })),
     };
     setSession(updated);
+    setChats(prev => prev.map(c => c.id === updated.id ? updated : c));
     await saveMasterChat(updated);
   }, [session]);
+
+  // ── Switch to a past chat ──────────────────────────────────────────────────
+  const handleSelectChat = useCallback(async (id: string) => {
+    const found = chats.find(c => c.id === id);
+    if (!found || found.id === session?.id) return;
+    await setActiveChatId(id);
+    setSession(found);
+    setPendingWorkout(null);
+  }, [chats, session]);
+
+  // ── Delete a chat from history ─────────────────────────────────────────────
+  const handleDeleteChat = useCallback(async (id: string) => {
+    await deleteMasterChat(id);
+    const remaining = chats.filter(c => c.id !== id);
+    setChats(remaining);
+    if (id === session?.id) {
+      if (remaining.length > 0) {
+        await setActiveChatId(remaining[0].id);
+        setSession(remaining[0]);
+      } else {
+        const s = createMasterChat();
+        await saveMasterChat(s);
+        await setActiveChatId(s.id);
+        setChats([s]);
+        setSession(s);
+      }
+      setPendingWorkout(null);
+    }
+  }, [chats, session]);
 
   // ── Apply actions returned by the coach ────────────────────────────────────
   const applyActions = useCallback(async (actions: MasterAction[]) => {
@@ -296,9 +333,14 @@ export function CoachScreen(_: Props) {
       <View style={s.header}>
         <Text style={s.headerTitle}>Coach</Text>
         {onboarded && (
-          <TouchableOpacity style={s.iconBtn} onPress={handleNewChat} activeOpacity={0.7}>
-            <Ionicons name="create-outline" size={18} color={colors.text.secondary} />
-          </TouchableOpacity>
+          <View style={s.headerActions}>
+            <TouchableOpacity style={s.iconBtn} onPress={() => setHistoryOpen(true)} activeOpacity={0.7}>
+              <Ionicons name="time-outline" size={18} color={colors.text.secondary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={s.iconBtn} onPress={handleNewChat} activeOpacity={0.7}>
+              <Ionicons name="create-outline" size={18} color={colors.text.secondary} />
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 
@@ -364,6 +406,15 @@ export function CoachScreen(_: Props) {
           />
         )
       )}
+
+      <ChatHistoryPanel
+        visible={historyOpen}
+        chats={chats}
+        activeChatId={session?.id ?? null}
+        onSelect={handleSelectChat}
+        onDelete={handleDeleteChat}
+        onClose={() => setHistoryOpen(false)}
+      />
     </View>
   );
 }
@@ -386,6 +437,10 @@ const s = StyleSheet.create({
   headerTitle: {
     ...typography.title2,
     color: colors.text.primary,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap:           spacing.xs,
   },
   iconBtn: {
     width:           36,

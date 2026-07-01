@@ -56,6 +56,11 @@ export async function setActiveChatId(id: string): Promise<void> {
   await AsyncStorage.setItem(KEY_ACTIVE_ID, id);
 }
 
+export async function deleteMasterChat(id: string): Promise<void> {
+  const all = await loadMasterChats();
+  await AsyncStorage.setItem(KEY_CHATS, JSON.stringify(all.filter(c => c.id !== id)));
+}
+
 export function createMasterChat(): MasterChat {
   return { id: `mc-${Date.now()}`, startedAt: Date.now(), messages: [] };
 }

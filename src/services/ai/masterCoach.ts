@@ -304,7 +304,22 @@ export function parseMasterActions(text: string): MasterAction[] {
     actions.push({ type: 'workout_done' });
   }
 
-  return actions;
+  // Deduplicate DIET:ADD and BURN:ADD by name within the same reply
+  const seenDiet = new Set<string>();
+  const seenBurn = new Set<string>();
+  return actions.filter(a => {
+    if (a.type === 'diet' && a.action.type === 'add') {
+      const key = a.action.entry.name.toLowerCase();
+      if (seenDiet.has(key)) return false;
+      seenDiet.add(key);
+    }
+    if (a.type === 'burn_add') {
+      const key = a.name.toLowerCase();
+      if (seenBurn.has(key)) return false;
+      seenBurn.add(key);
+    }
+    return true;
+  });
 }
 
 export function stripMasterActions(text: string): string {
@@ -312,6 +327,9 @@ export function stripMasterActions(text: string): string {
     .replace(/\[DIET:[^\]]+\]/g, '')
     .replace(/\[BURN:[^\]]+\]/g, '')
     .replace(/\[WORKOUT:[^\]]+\]/g, '')
+    .replace(/\[No Command Needed\]/gi, '')
+    .replace(/\[N\/A\]/gi, '')
+    .replace(/\[NONE\]/gi, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -327,6 +345,7 @@ ${contextBlock}
 You can control the user's app data directly. Embed commands at the end of your reply when the user logs something or asks you to.
 
 LOG FOOD — when the user mentions eating or drinking anything:
+First check TODAY'S DIET log above. If the same item (matching name) is already there, do NOT add it — tell the user it's already logged and show what was recorded. Only re-add if they say they ate it again.
 [DIET:ADD name="Food Name" amount="portion" calories=N protein=N carbs=N fats=N]
 [DIET:REMOVE id="id-from-log-above"]
 [DIET:UPDATE id="id-from-log-above" calories=N protein=N carbs=N fats=N]
@@ -335,6 +354,7 @@ LOG FOOD — when the user mentions eating or drinking anything:
 Deep Kerala cuisine knowledge — puttu, appam, parotta, meen curry, sadhya, idli, beef fry, etc.
 
 LOG CALORY BURN — when the user mentions any physical activity:
+First check TODAY'S CALORY BURN log above. If the same activity is already logged, do NOT add it again — tell the user it's already there. Only re-add if they confirm they did it again.
 [BURN:ADD name="30 min walk" calories=150]
 
 LOG WORKOUT SETS — when the user tells you their set result during a gym session:
@@ -349,7 +369,10 @@ result options: done (hit target reps), short (partial reps, use actual count), 
 - For burn: log any physical activity immediately.
 - For plan changes (routine edits, calorie target adjustments): confirm the change first, then act.
 - When referencing data, be specific — name the actual numbers, dates, and trends the user has logged.
-- Keep replies tight: 1–3 sentences unless the user asks for detail.`;
+- TRAINING ROUTINES: Do NOT build or output full training routines here. If the user wants to create or modify their routine, tell them to go to Plan → Training where the dedicated Trainer Coach can build and save the program properly. You can discuss workout principles and help them think it through.
+- DUPLICATE LOGGING: Before issuing any log command, check the existing log shown above. Do not log the same item twice unless the user explicitly confirms they did it again.
+- NO JUNK MARKERS: If no action command is needed, just reply with plain text. Never include [No Command Needed], [N/A], [NONE], or any placeholder markers.
+- Keep responses under 350 words. For detailed questions, give a thorough answer but stay under 600 words.`;
 }
 
 // ─── Main chat function ───────────────────────────────────────────────────────
@@ -365,7 +388,7 @@ export async function masterCoachChat(
   const rawReply = await aiChat([
     { role: 'system', content: system },
     ...history.filter(m => m.role !== 'system'),
-  ]);
+  ], 4096);
 
   return {
     display: stripMasterActions(rawReply),

@@ -36,11 +36,11 @@ const GROQ_BASE    = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL   = 'llama-3.3-70b-versatile';
 const GROQ_VISION  = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
-export async function groqChat(messages: ChatMessage[]): Promise<string> {
+export async function groqChat(messages: ChatMessage[], maxTokens = 8192): Promise<string> {
   const res = await fetch(GROQ_BASE, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
-    body: JSON.stringify({ model: GROQ_MODEL, messages }),
+    body: JSON.stringify({ model: GROQ_MODEL, messages, max_tokens: maxTokens }),
   });
   if (!res.ok) { const t = await res.text(); throw new Error(`Groq ${res.status}: ${t}`); }
   const data = await res.json();
@@ -80,11 +80,11 @@ export async function groqVisionChat(
 const DEEPSEEK_BASE  = 'https://api.deepseek.com/v1/chat/completions';
 const DEEPSEEK_MODEL = 'deepseek-chat';
 
-async function deepseekChat(messages: ChatMessage[]): Promise<string> {
+async function deepseekChat(messages: ChatMessage[], maxTokens = 8192): Promise<string> {
   const res = await fetch(DEEPSEEK_BASE, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEEPSEEK_API_KEY}` },
-    body: JSON.stringify({ model: DEEPSEEK_MODEL, messages }),
+    body: JSON.stringify({ model: DEEPSEEK_MODEL, messages, max_tokens: maxTokens }),
   });
   if (!res.ok) { const t = await res.text(); throw new Error(`DeepSeek ${res.status}: ${t}`); }
   const data = await res.json();
@@ -97,7 +97,7 @@ const ANTHROPIC_BASE    = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_MODEL   = 'claude-haiku-4-5-20251001';
 const ANTHROPIC_VERSION = '2023-06-01';
 
-async function anthropicChat(messages: ChatMessage[]): Promise<string> {
+async function anthropicChat(messages: ChatMessage[], maxTokens = 4096): Promise<string> {
   const system = messages.find(m => m.role === 'system')?.content ?? '';
   const body   = messages.filter(m => m.role !== 'system').map(m => ({ role: m.role, content: m.content }));
 
@@ -108,7 +108,7 @@ async function anthropicChat(messages: ChatMessage[]): Promise<string> {
       'x-api-key': ANTHROPIC_API_KEY,
       'anthropic-version': ANTHROPIC_VERSION,
     },
-    body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens: 2048, system, messages: body }),
+    body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens: maxTokens, system, messages: body }),
   });
   if (!res.ok) { const t = await res.text(); throw new Error(`Anthropic ${res.status}: ${t}`); }
   const data = await res.json();
@@ -148,10 +148,10 @@ async function anthropicVisionChat(
 
 // ── Tier-aware public API ─────────────────────────────────────────────────────
 
-export async function aiChat(messages: ChatMessage[]): Promise<string> {
-  if (_tier === 'ultra')   return anthropicChat(messages);
-  if (_tier === 'premium') return deepseekChat(messages);
-  return groqChat(messages);
+export async function aiChat(messages: ChatMessage[], maxTokens?: number): Promise<string> {
+  if (_tier === 'ultra')   return anthropicChat(messages, maxTokens);
+  if (_tier === 'premium') return deepseekChat(messages, maxTokens);
+  return groqChat(messages, maxTokens);
 }
 
 export async function aiVisionChat(

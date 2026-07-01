@@ -44,6 +44,7 @@ import {
 import { aiVisionChat } from '@/services/ai/client';
 import { checkImageLogAllowed, recordImageLog, checkAiMessageAllowed, recordAiMessage } from '@/services/ai/rateLimiter';
 import { useSubscription } from '@/app/providers/SubscriptionProvider';
+import type { SubscriptionTier } from '@/types/subscription';
 import type { ChatMessage, DietChat, StoredDietMessage } from '@/types/coaching';
 import type { NutritionGoals } from '@/types/user';
 import { loadTodayLog, saveTodayLog } from '@/services/storage/local/dietLogStorage';
@@ -620,10 +621,11 @@ const hp = StyleSheet.create({
 type DietCoachProps = {
   log: LogItem[];
   goals: NutritionGoals;
+  tier: SubscriptionTier;
   onDietActions: (actions: DietAction[]) => void;
 };
 
-function DietCoachTab({ log, goals, onDietActions }: DietCoachProps) {
+function DietCoachTab({ log, goals, tier, onDietActions }: DietCoachProps) {
   const [messages,    setMessages]    = useState<DietMessage[]>([WELCOME_MSG]);
   const [input,       setInput]       = useState('');
   const [loading,     setLoading]     = useState(false);
@@ -1079,7 +1081,7 @@ export function DietScreen({ navigation }: Props) {
         />
       )}
       {active === 'coach' && (
-        <DietCoachTab log={log} goals={goals} onDietActions={dispatchDietActions} />
+        <DietCoachTab log={log} goals={goals} tier={tier} onDietActions={dispatchDietActions} />
       )}
       {active === 'history' && <HistoryTab goals={goals} />}
     </View>
