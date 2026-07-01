@@ -88,4 +88,5 @@ export type PhotoEntry = {
   date: string;      // YYYY-MM-DD
   timestamp: number;
   section: string;   // defaults to 'General'
+  cloudPath?: string; // set once uploaded to Supabase Storage (premium/ultra only)
 };

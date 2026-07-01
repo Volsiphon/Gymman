@@ -1,3 +1,4 @@
+import 'react-native-url-polyfill/auto';
 import { registerRootComponent } from 'expo';
 import React from 'react';
 import { View } from 'react-native';
@@ -11,6 +12,7 @@ import {
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
 import { RootNavigator } from '@/app/navigation';
+import { AuthProvider } from '@/app/providers/AuthProvider';
 import { SubscriptionProvider } from '@/app/providers/SubscriptionProvider';
 import { colors } from '@/theme/colors';
 
@@ -29,11 +31,13 @@ function App() {
 
   return (
     <SafeAreaProvider>
-      <SubscriptionProvider>
-        <NavigationContainer>
-          <RootNavigator />
-        </NavigationContainer>
-      </SubscriptionProvider>
+      <AuthProvider>
+        <SubscriptionProvider>
+          <NavigationContainer>
+            <RootNavigator />
+          </NavigationContainer>
+        </SubscriptionProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

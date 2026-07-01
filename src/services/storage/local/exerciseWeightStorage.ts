@@ -7,15 +7,14 @@
  * it from scratch every session. Keyed by exercise name.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { readLocal, writeLocal } from '@/services/storage/localEnvelope';
 
-const KEY = '@gymman:exerciseWeights';
+const KEY = 'exerciseWeights';
 
 type WeightMap = Record<string, string>;
 
 export async function loadWeights(): Promise<WeightMap> {
-  const raw = await AsyncStorage.getItem(KEY);
-  return raw ? (JSON.parse(raw) as WeightMap) : {};
+  return (await readLocal<WeightMap>(KEY)) ?? {};
 }
 
 export async function saveWeight(routineId: string, exerciseName: string, kg: string): Promise<void> {
@@ -26,7 +25,7 @@ export async function saveWeight(routineId: string, exerciseName: string, kg: st
   } else {
     delete map[k];
   }
-  await AsyncStorage.setItem(KEY, JSON.stringify(map));
+  await writeLocal(KEY, map);
 }
 
 export function weightKey(routineId: string, exerciseName: string): string {

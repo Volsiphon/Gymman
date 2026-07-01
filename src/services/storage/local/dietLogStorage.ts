@@ -7,10 +7,10 @@
  * — diet logging is always for today only; historical data lives in dietChatStorage.ts.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { readLocal, writeLocal } from '@/services/storage/localEnvelope';
 import type { LogItem } from '@/services/ai/nutritionCoach';
 
-const KEY = '@gymman:dietLog';
+const KEY = 'dietLog';
 
 type PersistedLog = {
   date: string;      // YYYY-MM-DD
@@ -23,13 +23,19 @@ function todayKey(): string {
 }
 
 export async function loadTodayLog(): Promise<LogItem[]> {
-  const raw = await AsyncStorage.getItem(KEY);
-  if (!raw) return [];
-  const stored: PersistedLog = JSON.parse(raw);
+  const stored = await readLocal<PersistedLog | LogItem[]>(KEY);
+  if (!stored) return [];
+  if (Array.isArray(stored)) {
+    // Stale shape from an earlier sync engine that pushed the raw items array
+    // instead of the {date, items} wrapper this file actually stores under this
+    // key. There's no way to recover which day it was for, so treat it as
+    // expired rather than risk showing it as if it were today's log.
+    return [];
+  }
   return stored.date === todayKey() ? stored.items : [];
 }
 
 export async function saveTodayLog(items: LogItem[]): Promise<void> {
   const payload: PersistedLog = { date: todayKey(), items };
-  await AsyncStorage.setItem(KEY, JSON.stringify(payload));
+  await writeLocal(KEY, payload);
 }

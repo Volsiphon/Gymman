@@ -1,0 +1,155 @@
+FUTURE FEATURE STUBS
+====================
+These files are empty placeholders kept for planned features.
+Do not delete them. Implement them when the feature is ready.
+
+──────────────────────────────────────────────────────────────
+GLOBAL STATE STORE (src/store/)
+──────────────────────────────────────────────────────────────
+src/store/index.ts
+  Root store — wire up all slices (Zustand / Redux / Context).
+
+src/store/user/index.ts
+  User slice — in-memory cache of UserProfile from AsyncStorage.
+
+src/store/plan/index.ts
+  Plan slice — today's nutrition goals, calorie targets, etc.
+
+src/store/streak/index.ts
+  Streak slice — current streak count, last logged date, XP.
+
+src/store/subscription/index.ts
+  Subscription slice — free/premium tier, expiry, trial state.
+
+src/store/language/index.ts
+  Language slice — active locale (en / ml / manglish).
+
+──────────────────────────────────────────────────────────────
+AUTHENTICATION & CLOUD — current architecture (as of this session)
+──────────────────────────────────────────────────────────────
+One account, mandatory, database-primary. No multi-account switcher, no guest
+mode, no push/pull sync engine — all of that was built and then deliberately
+torn back out this session in favor of something much simpler:
+
+- src/services/storage/localEnvelope.ts — the single primitive every domain
+  file in services/storage/local/ goes through. Reads/writes go straight to
+  Supabase's `user_data` table (RLS-scoped to auth.uid()) for whoever's signed
+  in; AsyncStorage is purely a write-through cache (instant app open, tolerates
+  brief offline use), never the source of truth, never needs conflict
+  resolution. Covers every domain named in the app's own words: Routine, Diet,
+  Bloodwork, Cal Burn, Photos (metadata only), Progress, Account/profile,
+  Targets. Not premium-gated — every signed-in user gets this, any tier.
+- src/services/storage/cloud/photoCloud.ts — the one exception: actual photo
+  *bytes* upload only for premium/ultra (see PhotosScreen.tsx), automatic
+  based on tier, no manual toggle. Free tier images stay device-only.
+- src/services/auth/authService.ts — Supabase email/Google/phone sign-in.
+  Google needs an OAuth Client ID registered in Supabase Dashboard →
+  Authentication → Providers → Google. Phone needs an SMS provider (Twilio /
+  MessageBird / Vonage / TextLocal, your choice) under Authentication →
+  Providers → Phone (paid, per-message). Neither tested against a live
+  provider yet — code-complete, untested until that dashboard setup is done.
+- src/app/providers/AuthProvider.tsx — session context; gates rendering until
+  the initial session check resolves; forces a clean remount on sign-out (not
+  on the very first sign-up, so mid-onboarding progress survives).
+- src/app/navigation/RootNavigator.tsx — isAuthenticated is the gate for
+  showing Main at all. src/app/navigation/OnboardingNavigator.tsx starts at
+  Login directly (skipping Language/Welcome) if this device has a cached
+  profile from before, i.e. "kick out to the login screen" after signOut().
+- src/modules/onboarding/screens/LoginScreen.tsx — on success, checks
+  loadUserProfile() (reads straight from the DB) and skips straight to Main
+  for an account that already has one, instead of re-running Welcome →
+  GoalDescription → OnboardingChat → ... again.
+- src/app/providers/SubscriptionProvider.tsx — reads tier from `entitlements`
+  when signed in, falls back to local AsyncStorage tier otherwise (dev
+  override). Unrelated to the storage model above — entitlements is about
+  subscription tier, not data persistence.
+- supabase/schema.sql — entitlements + user_data tables, RLS, storage bucket.
+  Already fits the current model as-is, no schema changes needed. Run
+  manually once in the Supabase SQL editor (not executed automatically).
+  Connectivity-verified against a real project earlier this session.
+- shared/components/Input.tsx (LabeledInput) — implemented, moved out of
+  LoginScreen.tsx.
+
+Deliberately removed this session (built, then reverted as overcomplicated):
+multi-account switcher + SecureStore token cache (knownAccountsStorage.ts,
+accountSessionStore.ts), the push/pull/conflict-resolution sync engine
+(syncRegistry.ts, syncService.ts), the dataSync/photosSync toggle preferences
+(syncPreferencesStorage.ts), and a brief "Guest is a usable mode" experiment.
+
+Still needed to make this live: create the actual Supabase project (Mumbai
+region) if not already done, run supabase/schema.sql, set
+EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY in .env. Not yet
+tested end-to-end against a real signed-in session doing real reads/writes —
+needs the app actually running against a live project.
+
+Still pending, not started:
+- RevenueCat / Play Store / App Store IAP → write to `entitlements`
+- Razorpay/UPI payment flow → write to `entitlements` (same table, so either
+  path works without touching SubscriptionProvider again)
+- Calory burn's per-day keys (e.g. 'calburnActs_2026-07-01') work fine under
+  the new direct read/write model (each day is just its own `domain` string)
+  — no special-casing needed, unlike the old sync-registry design.
+- Restore-on-new-device for photos: photoCloud.ts can list what's in the cloud
+  but doesn't re-download missing photos into local files yet.
+- Offline write queue — DONE. A failed cloud write (offline) still lands in the
+  local cache immediately (UI never sees a failure) and gets queued in
+  localEnvelope.ts's pendingWrites. Drains automatically on the next successful
+  cloud read/write or when the app returns to the foreground (AppState). Queue
+  entries are tagged per-userId so a pending write from account A never gets
+  pushed under account B's session. No retry backoff/limit — simple by design.
+
+──────────────────────────────────────────────────────────────
+APP PROVIDERS (src/app/providers/)
+──────────────────────────────────────────────────────────────
+src/app/providers/ThemeProvider.tsx
+  Dynamic light/dark theme switching via React Context.
+
+──────────────────────────────────────────────────────────────
+INTERNATIONALISATION (src/i18n/)
+──────────────────────────────────────────────────────────────
+src/i18n/index.ts
+  i18next setup — namespaces, translation loader, changeLanguage.
+
+src/i18n/languageDetector.ts
+  Custom i18next language detector — reads from store/language.
+
+──────────────────────────────────────────────────────────────
+SHARED COMPONENTS — generic reusables (src/shared/components/)
+──────────────────────────────────────────────────────────────
+src/shared/components/Button.tsx
+  Themed primary/secondary/ghost button used across modules.
+
+src/shared/components/Card.tsx
+  Surface container with shadow/border — used by multiple screens.
+
+src/shared/components/Modal.tsx
+  Bottom-sheet / centered modal wrapper with backdrop dismiss.
+
+──────────────────────────────────────────────────────────────
+SHARED HOOKS (src/shared/hooks/)
+──────────────────────────────────────────────────────────────
+src/shared/hooks/usePremiumGate.ts
+  Returns { isPremium, showUpgradeModal } — blocks premium actions.
+  Depends on SubscriptionProvider.
+
+src/shared/hooks/useSubscription.ts
+  Returns subscription tier, expiry, trial status from store.
+
+src/shared/hooks/useLocalDate.ts
+  Returns today's date string in device local timezone (YYYY-MM-DD).
+  Needed for streak and daily-log keying.
+
+──────────────────────────────────────────────────────────────
+SHARED UTILS (src/shared/utils/)
+──────────────────────────────────────────────────────────────
+src/shared/utils/formatters.ts
+  Number/weight/calorie formatters (locale-aware, unit system).
+
+src/shared/utils/dateUtils.ts
+  Date arithmetic: daysBetween, startOfWeek, formatRelative, etc.
+
+──────────────────────────────────────────────────────────────
+SHARED CONSTANTS (src/shared/constants/)
+──────────────────────────────────────────────────────────────
+src/shared/constants/appConstants.ts
+  App-wide magic numbers and string keys (storage keys, timeouts).

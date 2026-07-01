@@ -7,11 +7,11 @@
  * conversation, so the intro splash never shows again.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { readLocal, writeLocal } from '@/services/storage/localEnvelope';
 
-const KEY_CHATS     = '@gymman:masterChats';
-const KEY_ONBOARDED = '@gymman:masterCoachOnboarded';
-const KEY_ACTIVE_ID = '@gymman:masterChatActiveId';
+const KEY_CHATS     = 'masterChats';
+const KEY_ONBOARDED = 'masterCoachOnboarded';
+const KEY_ACTIVE_ID = 'masterChatActiveId';
 const MAX_CHATS     = 50;
 
 export type MasterMessage = {
@@ -27,17 +27,15 @@ export type MasterChat = {
 };
 
 export async function isCoachOnboarded(): Promise<boolean> {
-  const raw = await AsyncStorage.getItem(KEY_ONBOARDED);
-  return raw === 'true';
+  return (await readLocal<boolean>(KEY_ONBOARDED)) ?? false;
 }
 
 export async function setCoachOnboarded(): Promise<void> {
-  await AsyncStorage.setItem(KEY_ONBOARDED, 'true');
+  await writeLocal(KEY_ONBOARDED, true);
 }
 
 export async function loadMasterChats(): Promise<MasterChat[]> {
-  const raw = await AsyncStorage.getItem(KEY_CHATS);
-  return raw ? (JSON.parse(raw) as MasterChat[]) : [];
+  return (await readLocal<MasterChat[]>(KEY_CHATS)) ?? [];
 }
 
 export async function saveMasterChat(chat: MasterChat): Promise<void> {
@@ -45,20 +43,20 @@ export async function saveMasterChat(chat: MasterChat): Promise<void> {
   const idx = all.findIndex(c => c.id === chat.id);
   if (idx >= 0) all[idx] = chat;
   else all.unshift(chat);
-  await AsyncStorage.setItem(KEY_CHATS, JSON.stringify(all.slice(0, MAX_CHATS)));
+  await writeLocal(KEY_CHATS, all.slice(0, MAX_CHATS));
 }
 
 export async function getActiveChatId(): Promise<string | null> {
-  return AsyncStorage.getItem(KEY_ACTIVE_ID);
+  return readLocal<string>(KEY_ACTIVE_ID);
 }
 
 export async function setActiveChatId(id: string): Promise<void> {
-  await AsyncStorage.setItem(KEY_ACTIVE_ID, id);
+  await writeLocal(KEY_ACTIVE_ID, id);
 }
 
 export async function deleteMasterChat(id: string): Promise<void> {
   const all = await loadMasterChats();
-  await AsyncStorage.setItem(KEY_CHATS, JSON.stringify(all.filter(c => c.id !== id)));
+  await writeLocal(KEY_CHATS, all.filter(c => c.id !== id));
 }
 
 export function createMasterChat(): MasterChat {

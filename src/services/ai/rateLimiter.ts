@@ -13,7 +13,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SubscriptionTier } from '@/types/subscription';
-import { SUBSCRIPTION_LIMITS } from '@/shared/constants/subscriptionLimits';
+import { SUBSCRIPTION_LIMITS } from '@/config/subscriptionLimits';
 
 const IMAGE_LOG_KEY  = 'gymman_rl_image_log';
 const AI_MESSAGE_KEY = 'gymman_rl_ai_message';

@@ -2,16 +2,21 @@
  * app/providers/SubscriptionProvider.tsx
  *
  * Provides the user's subscription tier to the whole app via useSubscription().
- * Currently backed by AsyncStorage so the tier can be set in dev without a
- * payment backend. When RevenueCat is integrated, replace the AsyncStorage load
- * with an entitlement check and call setTier() with the result — the rest stays
- * the same. setCurrentTier() from the AI client is kept in sync automatically.
+ * If the user is signed in (AuthProvider), the tier comes from the `entitlements`
+ * table in Supabase — the seam a future Play Store/App Store IAP receipt handler
+ * or a Razorpay/UPI webhook can both write into without this provider changing.
+ * If signed out, or the entitlements lookup fails/returns nothing, falls back to
+ * the local AsyncStorage tier exactly as before (keeps the dev override working
+ * and keeps the app usable fully offline). setCurrentTier() from the AI client is
+ * kept in sync automatically either way.
  */
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SubscriptionTier } from '@/types/subscription';
 import { setCurrentTier } from '@/services/ai/client';
+import { useAuth } from '@/app/providers/AuthProvider';
+import { supabase } from '@/services/storage/cloud/client';
 
 const TIER_KEY = 'gymman_subscription_tier';
 
@@ -26,21 +31,56 @@ const Context = createContext<SubscriptionCtx>({
   setTier: async () => {},
 });
 
+async function loadLocalTier(): Promise<SubscriptionTier> {
+  const v = await AsyncStorage.getItem(TIER_KEY);
+  return (v as SubscriptionTier | null) ?? 'free';
+}
+
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
+  const { userId, isAuthenticated } = useAuth();
   const [tier, _setTier] = useState<SubscriptionTier>('free');
 
   useEffect(() => {
-    AsyncStorage.getItem(TIER_KEY).then(v => {
-      const t = (v as SubscriptionTier | null) ?? 'free';
-      _setTier(t);
-      setCurrentTier(t);
-    });
-  }, []);
+    let cancelled = false;
+
+    async function resolveTier() {
+      let resolved: SubscriptionTier | null = null;
+
+      if (isAuthenticated && userId) {
+        const { data, error } = await supabase
+          .from('entitlements')
+          .select('tier, expires_at')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        const expired = !!data?.expires_at && new Date(data.expires_at) < new Date();
+        if (!error && data && !expired) resolved = data.tier as SubscriptionTier;
+      }
+
+      resolved ??= await loadLocalTier();
+      if (!cancelled) {
+        _setTier(resolved);
+        setCurrentTier(resolved);
+      }
+    }
+
+    resolveTier();
+    return () => { cancelled = true; };
+  }, [isAuthenticated, userId]);
 
   async function setTier(t: SubscriptionTier) {
     _setTier(t);
     setCurrentTier(t);
     await AsyncStorage.setItem(TIER_KEY, t);
+
+    if (isAuthenticated && userId) {
+      await supabase.from('entitlements').upsert({
+        user_id: userId,
+        tier: t,
+        source: 'manual',
+        updated_at: new Date().toISOString(),
+      });
+    }
   }
 
   return <Context.Provider value={{ tier, setTier }}>{children}</Context.Provider>;

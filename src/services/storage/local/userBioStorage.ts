@@ -7,9 +7,10 @@
  * for simple display purposes like greeting the user by name.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { readLocal, writeLocal } from '@/services/storage/localEnvelope';
 
-const KEY = 'gymman_user_bio';
+const KEY = 'userBio';
+const LEGACY_KEYS = ['gymman_user_bio'];
 
 export type UserBio = {
   bmr: number;
@@ -17,11 +18,9 @@ export type UserBio = {
 };
 
 export async function saveUserBio(bio: UserBio): Promise<void> {
-  await AsyncStorage.setItem(KEY, JSON.stringify(bio));
+  await writeLocal(KEY, bio);
 }
 
 export async function loadUserBio(): Promise<UserBio | null> {
-  const raw = await AsyncStorage.getItem(KEY);
-  if (!raw) return null;
-  try { return JSON.parse(raw) as UserBio; } catch { return null; }
+  return readLocal<UserBio>(KEY, LEGACY_KEYS);
 }

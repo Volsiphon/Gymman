@@ -8,7 +8,7 @@ Tech: React Native + Expo, React Navigation, Groq AI API, AsyncStorage, TypeScri
 
 ## The authoritative structure guide
 
-**`new-structure.md` in the project root is the single source of truth for how this codebase is organized.** Read it before creating or moving any file. The reorganization is being executed in 4 phases (see the phase plan in the conversation history). Until all phases are complete, some files may still be in their old locations.
+**`new-structure.md` in the project root is the single source of truth for how this codebase is organized.** Read it before creating or moving any file. The reorganization is complete — the tree in that file matches reality. Keep it that way: when you add, move, or delete a file, update `new-structure.md` in the same change. `Intern_Project_Rebuild.md` is the learning-order companion guide; keep its file references valid too.
 
 ## The 5 rules — never break these
 
@@ -22,13 +22,14 @@ Tech: React Native + Expo, React Navigation, Groq AI API, AsyncStorage, TypeScri
 
    | Layer | May import from |
    |---|---|
+   | `config/` | `types/` only |
    | `engine/` | Nothing from `src/` |
-   | `services/` | `engine/`, `types/` |
+   | `services/` | `engine/`, `types/`, `config/` |
    | `store/` | `types/` |
    | `contexts/` | `services/`, `store/`, `engine/` |
    | `shared/` | `theme/`, `types/`, `store/` |
-   | `modules/` | `services/`, `engine/`, `store/`, `contexts/`, `shared/`, `theme/`, `types/` |
-   | `app/` | `modules/`, `store/`, `contexts/` |
+   | `modules/` | `services/`, `engine/`, `store/`, `contexts/`, `shared/`, `theme/`, `types/`, `config/` |
+   | `app/` | `modules/`, `store/`, `contexts/`, `services/` |
 
 5. **The navigation tree is the module tree.** Every screen in a navigator has a home in `modules/`. If you create a screen, it goes in a module. If you create a navigator, it goes in `app/navigation/`.
 
@@ -36,7 +37,8 @@ Tech: React Native + Expo, React Navigation, Groq AI API, AsyncStorage, TypeScri
 
 ```
 modules/feature/
-├── FeatureScreen.tsx        ← or sub-folders (home/, diet/, etc.) for complex modules
+├── FeatureScreen.tsx        ← owns state, orchestrates; sub-folders (home/, diet/, …) for complex modules
+├── utils.ts                 ← (optional) helpers shared by the screen and its components
 ├── components/              ← UI pieces only used inside this module
 │   └── SomeComponent.tsx
 └── index.ts                 ← the only exit point
@@ -68,7 +70,10 @@ The `plan/` module is the exception because it's a stack navigator with multiple
 | Master coach personality | `services/ai/masterCoach.ts` |
 | Swap the AI provider globally | `services/ai/client.ts` |
 | Dynamic Mode ↔ Diet calorie bridge | `contexts/GoalsContext.tsx` |
-| Free vs premium limits | `shared/constants/subscriptionLimits.ts` |
+| Free vs premium limits | `config/subscriptionLimits.ts` |
+| AI daily message/photo-scan limits | `services/ai/rateLimiter.ts` |
+| Data caching + Supabase persistence | `services/storage/localEnvelope.ts` |
+| Sign in / sessions | `services/auth/authService.ts` + `app/providers/AuthProvider.tsx` |
 | CollapsibleTabBar (plan sub-screens) | `shared/components/CollapsibleTabBar.tsx` |
 | Colors / fonts / spacing | `src/theme/` |
 | Navigation types | `src/app/navigation/types.ts` |
@@ -80,11 +85,14 @@ The `plan/` module is the exception because it's a stack navigator with multiple
 - **Bloodwork** is a Plan stack screen, not a bottom tab. It lives in `modules/plan/bloodwork/`.
 - **GoalsContext** is a React Context (not a store slice) that bridges CaloryBurn → Diet → PlanHome. It's provided at `MainTabNavigator` level.
 - **ChatView** (`modules/coach/components/`) is a stateful wrapper specific to the Coach screen. **ChatInterface** (`shared/components/`) is the generic stateless bubble layout shared by the nutrition and trainer coaches.
+- **Two ChatHistoryPanels exist on purpose**: `modules/plan/diet/components/` (dietChatStorage) and `modules/coach/components/` (masterChatStorage). Each is private to its module.
 - **Kerala food library** lives at `modules/plan/diet/data/kerala-foods-library.json`.
 
 ## Storage layer
 
 Storage is fine-grained: one file per data domain in `services/storage/local/`. Do not consolidate them. When adding a new feature that persists data, add a new `featureStorage.ts` file — do not append to an existing one.
+
+All local storage files go through `services/storage/localEnvelope.ts`: for a signed-in user the Supabase `user_data` table is the source of truth and AsyncStorage is a per-user write-through cache with an offline queue; signed out, AsyncStorage is all there is. **There is no sync engine** — a push/pull design was built and deliberately removed. Do not reintroduce one; new domains just work through the envelope.
 
 ## Git commits
 

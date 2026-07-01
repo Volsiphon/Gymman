@@ -3,9 +3,10 @@
  *
  * The final onboarding screen. Calls executionPlan.ts to generate a personalised
  * training + diet guide from the user's goal analysis results, then displays it as
- * a scrollable formatted plan. When the user taps "Start", it saves the full profile
- * to userProfileStorage and navigates to the main app. This is the screen where the
- * user's journey officially begins.
+ * a scrollable formatted plan. When the user taps "Start", the profile is already
+ * saved (saveUserProfile writes straight to the database — see
+ * services/storage/localEnvelope.ts), so this just navigates to the main app. This
+ * is the screen where the user's journey officially begins.
  */
 
 import React, { useEffect, useRef, useState } from 'react';

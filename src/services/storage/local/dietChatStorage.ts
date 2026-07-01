@@ -7,16 +7,15 @@
  * in past sessions. The most recent chat is at index 0.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { readLocal, writeLocal } from '@/services/storage/localEnvelope';
 import type { DietChat } from '@/types/coaching';
 
 
-const KEY      = '@gymman:dietChats';
+const KEY      = 'dietChats';
 const MAX_CHATS = 50;
 
 export async function loadDietChats(): Promise<DietChat[]> {
-  const raw = await AsyncStorage.getItem(KEY);
-  return raw ? (JSON.parse(raw) as DietChat[]) : [];
+  return (await readLocal<DietChat[]>(KEY)) ?? [];
 }
 
 export async function saveDietChat(chat: DietChat): Promise<void> {
@@ -24,10 +23,10 @@ export async function saveDietChat(chat: DietChat): Promise<void> {
   const idx = list.findIndex(c => c.id === chat.id);
   if (idx >= 0) list[idx] = chat;
   else list.unshift(chat);
-  await AsyncStorage.setItem(KEY, JSON.stringify(list.slice(0, MAX_CHATS)));
+  await writeLocal(KEY, list.slice(0, MAX_CHATS));
 }
 
 export async function deleteDietChat(id: string): Promise<void> {
   const list = await loadDietChats();
-  await AsyncStorage.setItem(KEY, JSON.stringify(list.filter(c => c.id !== id)));
+  await writeLocal(KEY, list.filter(c => c.id !== id));
 }

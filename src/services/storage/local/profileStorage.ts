@@ -10,22 +10,17 @@
  * when it only needs macro targets, not the full profile.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { readLocal, writeLocal } from '@/services/storage/localEnvelope';
 import type { NutritionGoals } from '@/types/user';
 
 
-const KEY = 'gymman_nutrition_goals';
+const KEY = 'nutritionGoals';
+const LEGACY_KEYS = ['gymman_nutrition_goals'];
 
 export async function saveNutritionGoals(goals: NutritionGoals): Promise<void> {
-  await AsyncStorage.setItem(KEY, JSON.stringify(goals));
+  await writeLocal(KEY, goals);
 }
 
 export async function loadNutritionGoals(): Promise<NutritionGoals | null> {
-  const raw = await AsyncStorage.getItem(KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as NutritionGoals;
-  } catch {
-    return null;
-  }
+  return readLocal<NutritionGoals>(KEY, LEGACY_KEYS);
 }

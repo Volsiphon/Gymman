@@ -1,10 +1,19 @@
 /**
  * modules/plan/home/components/AccountModal.tsx
  *
- * Full-sheet account overview. Three sections:
+ * Full-sheet account overview. Four sections:
  *   1. Subscription — current tier badge + upgrade CTA
  *   2. Your Numbers — every stat we know from onboarding + computed body comp
  *   3. Streak & Week — full streak badge + Mon–Sun activity dots
+ *   4. Log Out
+ *
+ * Only ever reachable while signed in — RootNavigator requires auth to show Main
+ * at all. There's no cloud-backup toggle here: every signed-in user's data
+ * (routine, diet, bloodwork, cal burn, photo metadata, progress, profile, targets)
+ * is stored in the database unconditionally — see services/storage/localEnvelope.ts.
+ * The only thing tier still gates is transformation-photo cloud backup
+ * (premium/ultra, automatic — see PhotosScreen.tsx) and the AI/photo-section
+ * limits shown in the Subscription card below.
  *
  * Opens from the account icon in PlanHeader (to the left of the STREAK pill).
  */
@@ -17,6 +26,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSubscription } from '@/app/providers/SubscriptionProvider';
+import { useAuth } from '@/app/providers/AuthProvider';
 import type { UserProfile, NutritionGoals } from '@/types/user';
 import type { FlameState } from './FlameCol';
 import { colors } from '@/theme/colors';
@@ -136,8 +146,27 @@ export function AccountModal({
 }) {
   const insets      = useSafeAreaInsets();
   const { tier, setTier } = useSubscription();
+  const { isAuthenticated, email, signOut } = useAuth();
   const meta        = TIER_META[tier];
   const todayDow    = (new Date().getDay() + 6) % 7;
+
+  function handleLogOut() {
+    Alert.alert(
+      'Log out?',
+      email ? `You're signed in as ${email}.` : undefined,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: () => {
+            onClose();
+            signOut();
+          },
+        },
+      ],
+    );
+  }
 
   function handleSwitchTier() {
     Alert.alert(
@@ -202,13 +231,13 @@ export function AccountModal({
             <View style={s.subCardLeft}>
               <Text style={[s.subTierText, { color: meta.color }]}>{meta.label}</Text>
               {tier === 'free' && (
-                <Text style={s.subDesc}>20 AI messages/day · 1 photo scan/day · 1 photo section</Text>
+                <Text style={s.subDesc}>20 AI messages/day · 1 photo scan/day · 1 photo section · photos stay on this device</Text>
               )}
               {tier === 'premium' && (
-                <Text style={s.subDesc}>200 AI messages/day · Unlimited scans · 5 photo sections</Text>
+                <Text style={s.subDesc}>200 AI messages/day · Unlimited scans · 5 photo sections · photos backed up to your account</Text>
               )}
               {tier === 'ultra' && (
-                <Text style={s.subDesc}>Unlimited everything · Claude & GPT models · Unlimited sections</Text>
+                <Text style={s.subDesc}>Unlimited everything · Claude & GPT models · Unlimited sections · photos backed up to your account</Text>
               )}
             </View>
             <View style={s.subActions}>
@@ -332,6 +361,14 @@ export function AccountModal({
             </View>
           </View>
 
+          {/* ── Log out ─────────────────────────────────────────────── */}
+          {isAuthenticated && (
+            <TouchableOpacity style={s.logOutBtn} onPress={handleLogOut} activeOpacity={0.75}>
+              <Ionicons name="log-out-outline" size={16} color={colors.danger} />
+              <Text style={s.logOutText}>Log Out</Text>
+            </TouchableOpacity>
+          )}
+
         </ScrollView>
       </View>
     </Modal>
@@ -441,4 +478,12 @@ const s = StyleSheet.create({
   dot:           { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.bg.elevated },
   dotToday:      { borderWidth: 2, borderColor: colors.primaryBorder },
   dayLabel:      { ...typography.caption, color: colors.text.disabled, fontSize: 9 },
+
+  // Log out
+  logOutBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    marginTop: spacing.sm, paddingVertical: spacing.md,
+    borderRadius: radius.button, borderWidth: 1, borderColor: colors.dangerMuted,
+  },
+  logOutText: { ...typography.bodyMedium, color: colors.danger },
 });

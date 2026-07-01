@@ -8,20 +8,19 @@
  * loads the routine on focus to display the current workout plan.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { readLocal, writeLocal } from '@/services/storage/localEnvelope';
 import type { Routine } from '@/types/plan';
 
-const KEY = '@gymman:routines';
+const KEY = 'routines';
 
 export async function loadRoutines(): Promise<Routine[]> {
-  const raw = await AsyncStorage.getItem(KEY);
-  return raw ? (JSON.parse(raw) as Routine[]) : [];
+  return (await readLocal<Routine[]>(KEY)) ?? [];
 }
 
 export async function saveRoutine(routine: Routine): Promise<void> {
   const list = await loadRoutines();
   list.push(routine);
-  await AsyncStorage.setItem(KEY, JSON.stringify(list));
+  await writeLocal(KEY, list);
 }
 
 export async function updateRoutine(routine: Routine): Promise<void> {
@@ -29,10 +28,10 @@ export async function updateRoutine(routine: Routine): Promise<void> {
   const idx = list.findIndex((r) => r.id === routine.id);
   if (idx >= 0) list[idx] = routine;
   else list.push(routine);
-  await AsyncStorage.setItem(KEY, JSON.stringify(list));
+  await writeLocal(KEY, list);
 }
 
 export async function deleteRoutine(id: string): Promise<void> {
   const list = await loadRoutines();
-  await AsyncStorage.setItem(KEY, JSON.stringify(list.filter((r) => r.id !== id)));
+  await writeLocal(KEY, list.filter((r) => r.id !== id));
 }

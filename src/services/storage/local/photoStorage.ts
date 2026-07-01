@@ -7,18 +7,18 @@
  * so the Photos screen can list them without loading all photo metadata.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { readLocal, writeLocal } from '@/services/storage/localEnvelope';
 import type { PhotoEntry } from '@/types/plan';
 
-const PHOTOS_KEY   = 'gymman_progress_photos';
-const SECTIONS_KEY = 'gymman_photo_sections';
+const PHOTOS_KEY   = 'photos';
+const SECTIONS_KEY = 'photoSections';
+const LEGACY_PHOTOS_KEYS   = ['gymman_progress_photos'];
+const LEGACY_SECTIONS_KEYS = ['gymman_photo_sections'];
 
 const DEFAULT_SECTION = 'General';
 
 async function loadMap(): Promise<Record<string, PhotoEntry>> {
-  const raw = await AsyncStorage.getItem(PHOTOS_KEY);
-  if (!raw) return {};
-  try { return JSON.parse(raw) as Record<string, PhotoEntry>; } catch { return {}; }
+  return (await readLocal<Record<string, PhotoEntry>>(PHOTOS_KEY, LEGACY_PHOTOS_KEYS)) ?? {};
 }
 
 // ── Photos ────────────────────────────────────────────────────────────────────
@@ -34,7 +34,7 @@ export async function savePhoto(uri: string, section: string = DEFAULT_SECTION):
     section,
   };
   map[entry.id] = entry;
-  await AsyncStorage.setItem(PHOTOS_KEY, JSON.stringify(map));
+  await writeLocal(PHOTOS_KEY, map);
   return entry;
 }
 
@@ -50,21 +50,24 @@ export async function loadPhotos(section?: string): Promise<PhotoEntry[]> {
 export async function deletePhoto(id: string): Promise<void> {
   const map = await loadMap();
   delete map[id];
-  await AsyncStorage.setItem(PHOTOS_KEY, JSON.stringify(map));
+  await writeLocal(PHOTOS_KEY, map);
+}
+
+/** Records where a photo landed in cloud storage, once photoCloud.ts finishes an upload. */
+export async function setPhotoCloudPath(id: string, cloudPath: string): Promise<void> {
+  const map = await loadMap();
+  if (!map[id]) return;
+  map[id] = { ...map[id], cloudPath };
+  await writeLocal(PHOTOS_KEY, map);
 }
 
 // ── Sections ──────────────────────────────────────────────────────────────────
 
 export async function loadSections(): Promise<string[]> {
-  const raw = await AsyncStorage.getItem(SECTIONS_KEY);
-  if (!raw) return [DEFAULT_SECTION];
-  try {
-    const parsed = JSON.parse(raw) as string[];
-    if (!parsed.includes(DEFAULT_SECTION)) return [DEFAULT_SECTION, ...parsed];
-    return parsed;
-  } catch {
-    return [DEFAULT_SECTION];
-  }
+  const parsed = await readLocal<string[]>(SECTIONS_KEY, LEGACY_SECTIONS_KEYS);
+  if (!parsed) return [DEFAULT_SECTION];
+  if (!parsed.includes(DEFAULT_SECTION)) return [DEFAULT_SECTION, ...parsed];
+  return parsed;
 }
 
 export async function addSection(name: string): Promise<string[]> {
@@ -72,7 +75,7 @@ export async function addSection(name: string): Promise<string[]> {
   const trimmed  = name.trim();
   if (!trimmed || sections.includes(trimmed)) return sections;
   const updated = [...sections, trimmed];
-  await AsyncStorage.setItem(SECTIONS_KEY, JSON.stringify(updated));
+  await writeLocal(SECTIONS_KEY, updated);
   return updated;
 }
 
@@ -80,6 +83,6 @@ export async function deleteSection(name: string): Promise<string[]> {
   if (name === DEFAULT_SECTION) return loadSections();
   const sections = await loadSections();
   const updated  = sections.filter(s => s !== name);
-  await AsyncStorage.setItem(SECTIONS_KEY, JSON.stringify(updated));
+  await writeLocal(SECTIONS_KEY, updated);
   return updated;
 }

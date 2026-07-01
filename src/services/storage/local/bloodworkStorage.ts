@@ -8,9 +8,10 @@
  * renders charts over time for each tracked metric.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { readLocal, writeLocal } from '@/services/storage/localEnvelope';
 
-const KEY = 'gymman_bloodwork_logs';
+const KEY = 'bloodworkLogs';
+const LEGACY_KEYS = ['gymman_bloodwork_logs'];
 
 export type MetricDef = {
   key: string;
@@ -91,18 +92,16 @@ export async function saveBloodworkLog(log: BloodworkLog): Promise<void> {
   const all = await loadBloodworkLogs();
   const updated = [log, ...all.filter(l => l.id !== log.id)];
   updated.sort((a, b) => b.date.localeCompare(a.date));
-  await AsyncStorage.setItem(KEY, JSON.stringify(updated));
+  await writeLocal(KEY, updated);
 }
 
 export async function loadBloodworkLogs(): Promise<BloodworkLog[]> {
-  const raw = await AsyncStorage.getItem(KEY);
-  if (!raw) return [];
-  try { return JSON.parse(raw) as BloodworkLog[]; } catch { return []; }
+  return (await readLocal<BloodworkLog[]>(KEY, LEGACY_KEYS)) ?? [];
 }
 
 export async function deleteBloodworkLog(id: string): Promise<void> {
   const all = await loadBloodworkLogs();
-  await AsyncStorage.setItem(KEY, JSON.stringify(all.filter(l => l.id !== id)));
+  await writeLocal(KEY, all.filter(l => l.id !== id));
 }
 
 export function bloodworkContextString(logs: BloodworkLog[]): string {

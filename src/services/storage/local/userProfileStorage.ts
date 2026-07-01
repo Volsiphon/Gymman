@@ -11,11 +11,12 @@
  * shape used by the body-metrics engine.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { readLocal, writeLocal } from '@/services/storage/localEnvelope';
 import type { UserProfile, UserPhysicalStats } from '@/types/user';
 
 
-const KEY = 'gymman_user_profile';
+const KEY = 'userProfile';
+const LEGACY_KEYS = ['gymman_user_profile'];
 
 export function profileToStats(profile: UserProfile): UserPhysicalStats {
   return {
@@ -36,15 +37,9 @@ export function profileToStats(profile: UserProfile): UserPhysicalStats {
 export async function saveUserProfile(patch: Partial<UserProfile>): Promise<void> {
   const existing = await loadUserProfile();
   const merged = { ...(existing ?? {}), ...patch };
-  await AsyncStorage.setItem(KEY, JSON.stringify(merged));
+  await writeLocal(KEY, merged);
 }
 
 export async function loadUserProfile(): Promise<UserProfile | null> {
-  const raw = await AsyncStorage.getItem(KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as UserProfile;
-  } catch {
-    return null;
-  }
+  return readLocal<UserProfile>(KEY, LEGACY_KEYS);
 }

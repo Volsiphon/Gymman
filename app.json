@@ -3,6 +3,7 @@
     "name": "Gymman",
     "slug": "gymman",
     "version": "1.0.0",
+    "scheme": "gymman",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "splash": {
@@ -34,7 +35,8 @@
           "photosPermission": "Used to select your progress photos.",
           "cameraPermission": "Used to take your progress photos."
         }
-      ]
+      ],
+      "expo-web-browser"
     ]
   }
 }

@@ -9,12 +9,13 @@
  * Each day's activities are stored under a YYYY-MM-DD key so they never bleed across days.
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { readLocal, writeLocal } from '@/services/storage/localEnvelope';
 import type { ActivityEntry, DayActivities } from '@/types/plan';
 
 
-const KEY_DYNAMIC = 'gymman_calburn_dynamic';
-const KEY_ACTS    = 'gymman_calburn_acts';
+const KEY_DYNAMIC = 'calburnDynamic';
+const KEY_ACTS    = 'calburnActs';
+const LEGACY_KEY_DYNAMIC = ['gymman_calburn_dynamic'];
 
 function dateKey(d: Date): string {
   const y  = d.getFullYear();
@@ -23,24 +24,28 @@ function dateKey(d: Date): string {
   return `${KEY_ACTS}_${y}-${m}-${da}`;
 }
 
+function legacyDateKey(d: Date): string {
+  const y  = d.getFullYear();
+  const m  = String(d.getMonth() + 1).padStart(2, '0');
+  const da = String(d.getDate()).padStart(2, '0');
+  return `gymman_calburn_acts_${y}-${m}-${da}`;
+}
+
 export async function saveDynamicMode(enabled: boolean): Promise<void> {
-  await AsyncStorage.setItem(KEY_DYNAMIC, JSON.stringify(enabled));
+  await writeLocal(KEY_DYNAMIC, enabled);
 }
 
 export async function loadDynamicMode(): Promise<boolean> {
-  const raw = await AsyncStorage.getItem(KEY_DYNAMIC);
-  if (!raw) return false;
-  try { return JSON.parse(raw) as boolean; } catch { return false; }
+  return (await readLocal<boolean>(KEY_DYNAMIC, LEGACY_KEY_DYNAMIC)) ?? false;
 }
 
 export async function saveTodayActivities(activities: ActivityEntry[]): Promise<void> {
-  await AsyncStorage.setItem(dateKey(new Date()), JSON.stringify(activities));
+  await writeLocal(dateKey(new Date()), activities);
 }
 
 export async function loadTodayActivities(): Promise<ActivityEntry[]> {
-  const raw = await AsyncStorage.getItem(dateKey(new Date()));
-  if (!raw) return [];
-  try { return JSON.parse(raw) as ActivityEntry[]; } catch { return []; }
+  const d = new Date();
+  return (await readLocal<ActivityEntry[]>(dateKey(d), [legacyDateKey(d)])) ?? [];
 }
 
 export async function loadActivityHistory(days = 7): Promise<DayActivities[]> {
@@ -49,17 +54,12 @@ export async function loadActivityHistory(days = 7): Promise<DayActivities[]> {
   for (let i = 0; i < days; i++) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
-    const raw = await AsyncStorage.getItem(dateKey(d));
-    if (raw) {
-      try {
-        const acts = JSON.parse(raw) as ActivityEntry[];
-        if (acts.length > 0) {
-          const y  = d.getFullYear();
-          const m  = String(d.getMonth() + 1).padStart(2, '0');
-          const da = String(d.getDate()).padStart(2, '0');
-          result.push({ date: `${y}-${m}-${da}`, activities: acts });
-        }
-      } catch {}
+    const acts = await readLocal<ActivityEntry[]>(dateKey(d), [legacyDateKey(d)]);
+    if (acts && acts.length > 0) {
+      const y  = d.getFullYear();
+      const m  = String(d.getMonth() + 1).padStart(2, '0');
+      const da = String(d.getDate()).padStart(2, '0');
+      result.push({ date: `${y}-${m}-${da}`, activities: acts });
     }
   }
   return result;

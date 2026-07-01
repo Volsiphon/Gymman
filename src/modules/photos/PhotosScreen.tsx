@@ -6,6 +6,12 @@
  * are limited to "General"; Premium users can have up to 5 sections; Ultra
  * users can create as many as they want. Long-pressing a custom pill deletes
  * that section (photos in it move back to General).
+ *
+ * Cloud backup of the actual image bytes is automatic, not a toggle: premium/
+ * ultra uploads every new photo (services/storage/cloud/photoCloud.ts); free
+ * stays device-only. Photo metadata (section, date, etc.) is stored in the
+ * database for every signed-in user regardless of tier, same as every other
+ * domain — see services/storage/localEnvelope.ts.
  */
 
 import React, { useState, useCallback } from 'react';
@@ -21,12 +27,14 @@ import * as ImagePicker from 'expo-image-picker';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { MainTabParamList } from '@/app/navigation/types';
 import {
-  savePhoto, loadPhotos, deletePhoto,
+  savePhoto, loadPhotos, deletePhoto, setPhotoCloudPath,
   loadSections, addSection, deleteSection,
 } from '@/services/storage/local/photoStorage';
+import { uploadPhoto, deleteCloudPhoto } from '@/services/storage/cloud/photoCloud';
 import type { PhotoEntry } from '@/types/plan';
 import { useSubscription } from '@/app/providers/SubscriptionProvider';
-import { SUBSCRIPTION_LIMITS } from '@/shared/constants/subscriptionLimits';
+import { useAuth } from '@/app/providers/AuthProvider';
+import { SUBSCRIPTION_LIMITS } from '@/config/subscriptionLimits';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -49,6 +57,8 @@ function fmtDate(iso: string): string {
 export function PhotosScreen(_: Props) {
   const insets = useSafeAreaInsets();
   const { tier } = useSubscription();
+  const { userId, isAuthenticated } = useAuth();
+  const cloudBackupEnabled = isAuthenticated && tier !== 'free';
 
   const [photos, setPhotos]       = useState<PhotoEntry[]>([]);
   const [sections, setSections]   = useState<string[]>(['General']);
@@ -121,6 +131,14 @@ export function PhotosScreen(_: Props) {
     );
   }
 
+  // Fire-and-forget: free tier never calls this, so free-tier photos never leave the device.
+  function backupToCloud(entry: PhotoEntry) {
+    if (!cloudBackupEnabled || !userId) return;
+    uploadPhoto(entry.uri, userId, entry.id).then(cloudPath => {
+      if (cloudPath) setPhotoCloudPath(entry.id, cloudPath);
+    });
+  }
+
   async function pickFromGallery() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -131,7 +149,8 @@ export function PhotosScreen(_: Props) {
       mediaTypes: 'images', quality: 0.85, allowsMultipleSelection: false,
     });
     if (!result.canceled && result.assets[0]) {
-      await savePhoto(result.assets[0].uri, activeSection);
+      const entry = await savePhoto(result.assets[0].uri, activeSection);
+      backupToCloud(entry);
       refresh();
     }
   }
@@ -144,7 +163,8 @@ export function PhotosScreen(_: Props) {
     }
     const result = await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 0.85 });
     if (!result.canceled && result.assets[0]) {
-      await savePhoto(result.assets[0].uri, activeSection);
+      const entry = await savePhoto(result.assets[0].uri, activeSection);
+      backupToCloud(entry);
       refresh();
     }
   }
@@ -155,7 +175,9 @@ export function PhotosScreen(_: Props) {
       {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
+          const cloudPath = photos.find(p => p.id === id)?.cloudPath;
           await deletePhoto(id);
+          if (cloudPath) deleteCloudPhoto(cloudPath);
           refresh();
           setViewer(null);
         },
@@ -220,7 +242,13 @@ export function PhotosScreen(_: Props) {
           columnWrapperStyle={s.row}
           contentContainerStyle={s.grid}
           showsVerticalScrollIndicator={false}
-          ListFooterComponent={<Text style={s.hint}>Photos are stored privately on your device.</Text>}
+          ListFooterComponent={
+            <Text style={s.hint}>
+              {cloudBackupEnabled
+                ? 'Photos are backed up privately to your account — nothing is ever lost.'
+                : 'Photos are stored privately on your device.'}
+            </Text>
+          }
           renderItem={({ item }) => (
             <TouchableOpacity activeOpacity={0.9} onPress={() => setViewer(item)}>
               <Image source={{ uri: item.uri }} style={s.cell} />
@@ -249,7 +277,11 @@ export function PhotosScreen(_: Props) {
               <Text style={s.addBtnText}>Take a photo</Text>
             </TouchableOpacity>
           </View>
-          <Text style={s.hint}>Photos are stored privately on your device. You choose what the AI sees.</Text>
+          <Text style={s.hint}>
+            {cloudBackupEnabled
+              ? 'Photos are backed up privately to your account — nothing is ever lost. You choose what the AI sees.'
+              : 'Photos are stored privately on your device. You choose what the AI sees.'}
+          </Text>
         </View>
       )}
 

@@ -1,4 +1,6 @@
-# Gymman — Ideal Project Structure
+# Gymman — Project Structure
+
+This file is the single source of truth for how the codebase is organized. It describes what **is**, not what might be — if reality and this document disagree, one of them is a bug.
 
 ## Guiding principles
 
@@ -15,19 +17,22 @@
 ```
 gymman/
 ├── App.tsx                      ← Root entry: wraps providers, mounts RootNavigator
+├── supabase/
+│   └── schema.sql               ← user_data + entitlements tables, RLS, storage bucket
+│                                   (run manually once in the Supabase SQL editor)
 │
 ├── src/
 │   ├── app/                     ← The spine of the app
 │   │   ├── navigation/
-│   │   │   ├── RootNavigator.tsx        ← Onboarded? → Main. Else → Onboarding
-│   │   │   ├── OnboardingNavigator.tsx  ← Linear stack, no tab bar
-│   │   │   ├── MainTabNavigator.tsx     ← 5 bottom tabs
+│   │   │   ├── RootNavigator.tsx        ← Authenticated + onboarded? → Main. Else → Onboarding
+│   │   │   ├── OnboardingNavigator.tsx  ← Linear stack, no tab bar (starts at Login for returning devices)
+│   │   │   ├── MainTabNavigator.tsx     ← 5 bottom tabs (provides GoalsContext)
 │   │   │   ├── PlanNavigator.tsx        ← Stack inside the Plan tab
 │   │   │   └── types.ts                 ← All navigation param lists in one place
 │   │   └── providers/
 │   │       ├── ThemeProvider.tsx
-│   │       ├── AuthProvider.tsx
-│   │       └── SubscriptionProvider.tsx
+│   │       ├── AuthProvider.tsx         ← Supabase session context; remounts app on sign-out
+│   │       └── SubscriptionProvider.tsx ← Tier from `entitlements` when signed in, local override otherwise
 │   │
 │   ├── modules/                 ← Every feature the user sees
 │   │   │
@@ -35,16 +40,13 @@ gymman/
 │   │   │   ├── screens/
 │   │   │   │   ├── LanguageSelectionScreen.tsx   ← First screen, renders static text
 │   │   │   │   ├── WelcomeScreen.tsx
-│   │   │   │   ├── LoginScreen.tsx
+│   │   │   │   ├── LoginScreen.tsx               ← Email/Google/phone; skips to Main if profile exists
 │   │   │   │   ├── GoalDescriptionScreen.tsx     ← User types their goal in their own words
-│   │   │   │   ├── OnboardingChatScreen.tsx      ← AI chat that collects physical stats (replaces static form)
+│   │   │   │   ├── OnboardingChatScreen.tsx      ← AI chat that collects physical stats
 │   │   │   │   ├── PhotoCaptureScreen.tsx        ← Optional step
 │   │   │   │   ├── GoalAnalysisScreen.tsx        ← AI analyses the goal live (3-phase)
-│   │   │   │   ├── StatsRevealScreen.tsx         ← Shows calculated BMR/TDEE/body fat
+│   │   │   │   ├── StatsRevealScreen.tsx         ← Calculated BMR/TDEE/body fat (calls engine/ directly)
 │   │   │   │   └── ExecutionPlanScreen.tsx       ← Final screen: here is your plan
-│   │   │   ├── components/                       ← UI pieces only used in onboarding
-│   │   │   ├── utils/
-│   │   │   │   └── fitnessCalculations.ts        ← BMR/TDEE helpers for the reveal screen
 │   │   │   └── index.ts
 │   │   │
 │   │   ├── plan/                ← The entire Plan tab and everything reachable from it
@@ -52,72 +54,91 @@ gymman/
 │   │   │   ├── home/            ← PlanScreen: the Plan tab's root/dashboard
 │   │   │   │   ├── PlanScreen.tsx
 │   │   │   │   ├── PlaceholderDetailScreen.tsx  ← "Being built" screen for unimplemented plan sub-screens
-│   │   │   │   └── components/
-│   │   │   │       ├── PlanHeader.tsx              ← GYMMAN brand + STREAK pill + 7-DAY pill
-│   │   │   │       ├── TodayTargets.tsx            ← Calories / Goal Weight / Macros card
-│   │   │   │       ├── SectionCard.tsx             ← Tappable card → Diet / Training / Burn
-│   │   │   │       ├── BloodworkButton.tsx         ← Red pill → Bloodwork screen
-│   │   │   │       ├── FlameCol.tsx                ← Single animated flame column
-│   │   │   │       ├── StreakModal.tsx              ← Full streak breakdown sheet
-│   │   │   │       └── StreakCelebrationModal.tsx  ← Pop-up when a new flame lights
+│   │   │   │   ├── components/
+│   │   │   │   │   ├── PlanHeader.tsx              ← GYMMAN brand + STREAK pill + 7-DAY pill
+│   │   │   │   │   ├── TodayTargets.tsx            ← Calories / Goal Weight / Macros card
+│   │   │   │   │   ├── TargetsCarousel.tsx         ← Swipeable targets card carousel
+│   │   │   │   │   ├── BodyCompositionCard.tsx     ← BMI / body fat / lean mass display
+│   │   │   │   │   ├── SectionCard.tsx             ← Tappable card → Diet / Training / Burn
+│   │   │   │   │   ├── BloodworkButton.tsx         ← Red pill → Bloodwork screen
+│   │   │   │   │   ├── AccountModal.tsx            ← Account sheet: profile, sign-out, tier
+│   │   │   │   │   ├── FlameCol.tsx                ← Single animated flame column
+│   │   │   │   │   ├── StreakModal.tsx             ← Full streak breakdown sheet
+│   │   │   │   │   └── StreakCelebrationModal.tsx  ← Pop-up when a new flame lights
+│   │   │   │   └── index.ts
 │   │   │   │
 │   │   │   ├── diet/            ← Diet logging + AI nutrition coach
-│   │   │   │   ├── DietScreen.tsx
-│   │   │   │   └── components/
-│   │   │   │       ├── TodayTab.tsx           ← Calorie/macro summary + food log list
-│   │   │   │       ├── DietCoachTab.tsx       ← AI chat that writes to the log
-│   │   │   │       ├── HistoryTab.tsx         ← Past days' summaries
-│   │   │   │       ├── ManualLogModal.tsx     ← Bottom sheet: log a meal by hand
-│   │   │   │       ├── ChatHistoryPanel.tsx   ← Full-screen list of past chat sessions
-│   │   │   │       └── MacroBar.tsx           ← Reusable progress bar for one macro
+│   │   │   │   ├── DietScreen.tsx         ← Owns today's log state, switches the three tabs
+│   │   │   │   ├── utils.ts               ← uid() + applyDietActions() log reducer
+│   │   │   │   ├── components/
+│   │   │   │   │   ├── TodayTab.tsx           ← Calorie/macro summary + food log list
+│   │   │   │   │   ├── DietCoachTab.tsx       ← AI chat that writes to the log via [DIET:] actions
+│   │   │   │   │   ├── HistoryTab.tsx         ← Past days' summaries (placeholder data for now)
+│   │   │   │   │   ├── ManualLogModal.tsx     ← Bottom sheet: log a meal by hand
+│   │   │   │   │   ├── ChatHistoryPanel.tsx   ← Full-screen list of past nutrition chats
+│   │   │   │   │   └── MacroBar.tsx           ← Progress bar for one macro
+│   │   │   │   ├── data/
+│   │   │   │   │   └── kerala-foods-library.json
+│   │   │   │   └── index.ts
 │   │   │   │
 │   │   │   ├── training/        ← AI trainer + routine management + workout logging
-│   │   │   │   ├── TrainingScreen.tsx
-│   │   │   │   └── components/
-│   │   │   │       ├── TrainerIntroView.tsx   ← AI trainer intro + chat (Trainer tab)
-│   │   │   │       ├── RoutineDisplay.tsx     ← Weekly routine card grid (Routine tab)
-│   │   │   │       ├── DayCard.tsx            ← One training day: exercises + weight inputs
-│   │   │   │       ├── TodayWorkoutView.tsx   ← Log today's actual sets (Today tab)
-│   │   │   │       └── HistoryView.tsx        ← Past workout sessions (History tab)
+│   │   │   │   ├── TrainingScreen.tsx     ← Orchestrates the four tabs
+│   │   │   │   ├── components/
+│   │   │   │   │   ├── TrainerIntroView.tsx   ← AI trainer intro + chat (Trainer tab)
+│   │   │   │   │   ├── RoutineDisplay.tsx     ← Weekly routine: chip selector + DayCards (Routine tab)
+│   │   │   │   │   ├── DayCard.tsx            ← One training day: exercises + weight inputs
+│   │   │   │   │   ├── TodayWorkoutView.tsx   ← Log today's actual sets (Today tab)
+│   │   │   │   │   └── HistoryView.tsx        ← Past workout sessions (History tab)
+│   │   │   │   └── index.ts
 │   │   │   │
 │   │   │   ├── calory-burn/     ← Daily activity burn logging + Dynamic Mode
-│   │   │   │   ├── CaloryBurnScreen.tsx
-│   │   │   │   └── components/
-│   │   │   │       ├── TodayTab.tsx           ← Activity list + Dynamic Mode toggle + AI bar
-│   │   │   │       ├── HistoryTab.tsx         ← Past days' activity summaries
-│   │   │   │       └── ManualAddModal.tsx     ← Bottom sheet: add activity by hand
+│   │   │   │   ├── CaloryBurnScreen.tsx   ← Owns activity state + inline AI activity parser
+│   │   │   │   ├── components/
+│   │   │   │   │   ├── TodayTab.tsx           ← Dynamic Mode toggle + activity list + AI bar
+│   │   │   │   │   ├── HistoryTab.tsx         ← Past days' activity summaries
+│   │   │   │   │   └── ManualAddModal.tsx     ← Bottom sheet: add activity by hand
+│   │   │   │   └── index.ts
 │   │   │   │
 │   │   │   ├── bloodwork/       ← Blood marker tracker (accessible from Plan home)
-│   │   │   │   ├── BloodworkScreen.tsx
-│   │   │   │   └── components/
-│   │   │   │       ├── PrepTipsCard.tsx       ← Expandable "before your draw" tips
-│   │   │   │       ├── AddLogModal.tsx        ← Full-screen form: enter lab values
-│   │   │   │       └── LogDetailModal.tsx     ← Full-screen view of a past log entry
+│   │   │   │   ├── BloodworkScreen.tsx    ← Summary card + past logs list
+│   │   │   │   ├── utils.ts               ← TIER_GROUPS + date/count helpers shared by screen + modals
+│   │   │   │   ├── components/
+│   │   │   │   │   ├── PrepTipsCard.tsx       ← Expandable "before your draw" tips
+│   │   │   │   │   ├── AddLogModal.tsx        ← Full-screen form: enter lab values by tier
+│   │   │   │   │   └── LogDetailModal.tsx     ← Full-screen view of a past log entry
+│   │   │   │   └── index.ts
 │   │   │   │
 │   │   │   └── review/          ← 7-day weekly review + plan calibration
-│   │   │       ├── SevenDayScreen.tsx
-│   │   │       └── components/
-│   │   │           ├── DayGrid.tsx            ← M–S dots: diet logged / weight logged
-│   │   │           ├── CalorieSummary.tsx     ← Avg daily eaten vs. target, weekly net
-│   │   │           ├── WeightTracker.tsx      ← Start/end weight, actual vs. expected change
-│   │   │           ├── CalibrationCard.tsx    ← Implied maintenance, confidence level
-│   │   │           └── InsightsList.tsx       ← Bullet insights from the engine
+│   │   │       ├── SevenDayScreen.tsx     ← Calls the engine, lays out the cards (placeholder data for now)
+│   │   │       ├── components/
+│   │   │       │   ├── DayGrid.tsx            ← M–S dots: diet logged / weight logged
+│   │   │       │   ├── CalorieSummary.tsx     ← Avg daily eaten vs. target, weekly net
+│   │   │       │   ├── WeightTracker.tsx      ← Start/end weight, actual vs. expected change
+│   │   │       │   ├── CalibrationCard.tsx    ← Implied maintenance, confidence level
+│   │   │       │   └── InsightsList.tsx       ← Bullet insights from the engine
+│   │   │       └── index.ts
 │   │   │
 │   │   ├── progress/            ← Daily body weight log + trend chart
 │   │   │   ├── ProgressScreen.tsx
-│   │   │   └── components/
-│   │   │       └── WeightChart.tsx            ← Custom SVG-style line chart
+│   │   │   ├── utils.ts               ← Date formatting shared by screen + chart
+│   │   │   ├── components/
+│   │   │   │   └── WeightChart.tsx        ← Custom line chart built from plain Views
+│   │   │   └── index.ts
 │   │   │
 │   │   ├── photos/              ← Transformation photo storage
-│   │   │   └── PhotosScreen.tsx              ← Camera + gallery + grid + full-screen viewer
+│   │   │   ├── PhotosScreen.tsx       ← Camera + gallery + grid + full-screen viewer
+│   │   │   └── index.ts               (cloud photo upload for premium/ultra via photoCloud)
 │   │   │
 │   │   ├── coach/               ← Master AI coach with full app context
-│   │   │   ├── CoachScreen.tsx
-│   │   │   └── components/
-│   │   │       └── ChatView.tsx              ← Reusable stateless chat UI used only here
+│   │   │   ├── CoachScreen.tsx        ← Voice input (Whisper) + speech output live here
+│   │   │   ├── components/
+│   │   │   │   ├── ChatView.tsx           ← Stateful chat UI wired to masterCoach
+│   │   │   │   └── ChatHistoryPanel.tsx   ← Past master-coach chats (masterChatStorage)
+│   │   │   └── index.ts
 │   │   │
 │   │   └── shop/                ← Vetted gym products marketplace
-│   │       └── ShopScreen.tsx
+│   │       ├── ShopScreen.tsx         ← Local product data, no external calls
+│   │       └── index.ts
 │   │
 │   ├── engine/                  ← Pure math. No UI. No storage. No API calls.
 │   │   │                           Given numbers → returns numbers. Always testable in isolation.
@@ -148,7 +169,9 @@ gymman/
 │   │   │                           Modules call services. Services never call modules.
 │   │   │
 │   │   ├── ai/                  ← One file per coach/role — different prompts, different rules
-│   │   │   ├── client.ts              ← Groq API connection: groqChat, groqVisionChat
+│   │   │   ├── client.ts              ← Groq API connection: aiChat, aiVisionChat
+│   │   │   ├── rateLimiter.ts         ← Daily counters for AI messages + photo scans, per tier
+│   │   │   ├── whisper.ts             ← Voice input: audio file → Groq Whisper → transcript
 │   │   │   ├── nutritionCoach.ts      ← Diet AI: parses food, estimates macros, edits the log
 │   │   │   ├── trainerCoach.ts        ← Training AI: builds routines, coaches form
 │   │   │   ├── masterCoach.ts         ← Coach tab: full journey context, can modify targets
@@ -157,14 +180,19 @@ gymman/
 │   │   │   ├── onboardingChat.ts      ← Onboarding: structured questionnaire chat AI (stat collection)
 │   │   │   ├── onboardingCoach.ts     ← Onboarding: acknowledgment AI (warm replies after each answer)
 │   │   │   ├── statParser.ts          ← Onboarding: AI-based field parser (groqParseField)
-│   │   │   └── physicalStatsParser.ts ← Onboarding: regex fallback parsers used by onboardingChat when API is down
+│   │   │   └── physicalStatsParser.ts ← Onboarding: regex fallback parsers when the API is down
 │   │   │
 │   │   ├── storage/
-│   │   │   ├── local/           ← AsyncStorage wrappers, one file per data domain
+│   │   │   ├── localEnvelope.ts ← THE storage primitive. Every local/ file goes through this.
+│   │   │   │                       Signed in: Supabase `user_data` is the source of truth,
+│   │   │   │                       AsyncStorage is a per-user write-through cache with an
+│   │   │   │                       offline pending-write queue. Signed out: AsyncStorage only.
+│   │   │   │
+│   │   │   ├── local/           ← One file per data domain (never consolidate these)
 │   │   │   │   │
 │   │   │   │   │   USER
-│   │   │   │   ├── userProfileStorage.ts   ← Complete UserProfile: physical stats + computed values (BMR, TDEE, BF%, targets, macros)
-│   │   │   │   ├── profileStorage.ts       ← Nutrition goals (calories, macros) — quick-access targets used by diet screen
+│   │   │   │   ├── userProfileStorage.ts   ← Complete UserProfile: physical stats + computed values
+│   │   │   │   ├── profileStorage.ts       ← Nutrition goals (calories, macros) — quick-access targets
 │   │   │   │   ├── userBioStorage.ts       ← BMR, goal offset (computed during onboarding)
 │   │   │   │   │
 │   │   │   │   │   PLAN — DIET
@@ -182,43 +210,44 @@ gymman/
 │   │   │   │   ├── caloryBurnStorage.ts    ← Daily activity logs + dynamic mode flag
 │   │   │   │   │
 │   │   │   │   │   PLAN — BLOODWORK
-│   │   │   │   ├── bloodworkStorage.ts     ← Blood marker logs (dated entries)
+│   │   │   │   ├── bloodworkStorage.ts     ← Blood marker logs + the METRICS catalogue
 │   │   │   │   │
 │   │   │   │   │   PROGRESS
 │   │   │   │   ├── bodyWeightStorage.ts    ← Daily body weight entries
 │   │   │   │   │
 │   │   │   │   │   PHOTOS
-│   │   │   │   └── photoStorage.ts         ← Transformation photo metadata + URIs
+│   │   │   │   ├── photoStorage.ts         ← Transformation photo metadata + URIs
+│   │   │   │   │
+│   │   │   │   │   COACH
+│   │   │   │   └── masterChatStorage.ts    ← Master coach chat sessions
 │   │   │   │
-│   │   │   └── cloud/           ← Cloud mirrors — same signatures as local/, switch by tier
-│   │   │       ├── userCloud.ts
-│   │   │       ├── planCloud.ts
-│   │   │       └── photoCloud.ts
+│   │   │   └── cloud/
+│   │   │       ├── client.ts          ← Supabase client singleton (session persisted to AsyncStorage)
+│   │   │       └── photoCloud.ts      ← Binary photo upload/list to Supabase Storage (premium/ultra only)
 │   │   │
 │   │   ├── auth/
-│   │   │   └── authService.ts         ← Login, logout, session, Google OAuth
-│   │   ├── sync/
-│   │   │   └── syncService.ts         ← Migrates local data to cloud on upgrade
+│   │   │   └── authService.ts         ← Sign up/in/out, session, Supabase Auth
+│   │   │                                 (Google OAuth + phone SMS: code-complete, provider setup pending)
 │   │   └── weeklyReview/
-│   │       └── weeklyReviewService.ts ← Reads data → calls engine → writes adjusted targets
+│   │       └── weeklyReviewService.ts ← STUB: will bridge SevenDayScreen ↔ engine ↔ storage
 │   │
 │   ├── contexts/                ← React Contexts for cross-cutting computed state
 │   │   └── GoalsContext.tsx     ← Dynamic calorie goals: bridges CaloryBurn ↔ Diet ↔ PlanHome
 │   │                               (Provided at MainTabNavigator level, consumed by 3 screens)
 │   │
 │   ├── store/                   ← Global state that must cross module boundaries
-│   │   ├── user/                ← UserProfile, body metrics, goals, onboarding flag
-│   │   ├── plan/                ← Plan-level shared state
-│   │   ├── streak/              ← Streak counts (read by Plan home, written by 3 sub-modules)
-│   │   ├── subscription/        ← free / premium / max tier (read by almost everything)
-│   │   ├── language/            ← Persisted language choice
+│   │   ├── user/                ← (stubs — see todo.txt; wire up when needed)
+│   │   ├── plan/
+│   │   ├── streak/
+│   │   ├── subscription/
+│   │   ├── language/
 │   │   └── index.ts
 │   │
 │   ├── shared/                  ← ONLY what 2+ unrelated modules actually use
 │   │   ├── components/
 │   │   │   ├── Button.tsx
 │   │   │   ├── Card.tsx
-│   │   │   ├── Input.tsx
+│   │   │   ├── Input.tsx              ← LabeledInput (login + forms)
 │   │   │   ├── Modal.tsx
 │   │   │   ├── ChatInterface.tsx      ← Generic chat bubble UI (nutrition + trainer share it)
 │   │   │   └── CollapsibleTabBar.tsx  ← Tab strip used by Diet, Training, AND Calory Burn
@@ -230,8 +259,7 @@ gymman/
 │   │   │   ├── dateUtils.ts
 │   │   │   └── formatters.ts
 │   │   └── constants/
-│   │       ├── subscriptionLimits.ts  ← All free/premium/max limits in one file
-│   │       └── appConstants.ts
+│   │       └── appConstants.ts        ← App-wide magic numbers and string keys
 │   │
 │   ├── theme/                   ← Design tokens only. No logic, no components.
 │   │   ├── colors.ts            ← Full color palette. Hex values live ONLY here.
@@ -240,9 +268,10 @@ gymman/
 │   │   └── index.ts
 │   │
 │   ├── types/                   ← Shared TypeScript contracts
-│   │   ├── user.ts              ← UserProfile, OnboardingData, BodyMetrics, Goal, SubscriptionTier
-│   │   ├── plan.ts              ← FoodEntry, Routine, RoutineDay, Exercise, WorkoutLog, BurnActivity
-│   │   ├── coaching.ts          ← ChatMessage, ChatSession, CoachContext, ContextWindowConfig
+│   │   ├── user.ts              ← UserProfile, OnboardingData, BodyMetrics, Goal, NutritionGoals
+│   │   ├── plan.ts              ← FoodEntry, Routine, RoutineDay, Exercise, WorkoutLog, ActivityEntry
+│   │   ├── coaching.ts          ← ChatMessage, ChatSession, DietChat, CoachContext
+│   │   ├── subscription.ts      ← SubscriptionTier
 │   │   ├── shop.ts              ← Product, CartItem, Order, VettedBadge
 │   │   └── index.ts
 │   │
@@ -255,8 +284,9 @@ gymman/
 │   │   ├── ml/          ← Malayalam (Unicode) — needs Noto Sans Malayalam in assets/fonts/
 │   │   └── manglish/    ← Phonetic Malayalam in Latin script, no special font needed
 │   │
-│   └── config/
-│       └── keys.ts      ← API keys and environment config (never commit secrets here)
+│   └── config/          ← Bottom-layer app configuration. Anyone may import from here.
+│       ├── keys.ts                ← API keys and environment config (never commit secrets)
+│       └── subscriptionLimits.ts  ← All free/premium/ultra limits in one file
 │
 └── assets/
     ├── fonts/           ← Custom typefaces, including Noto Sans Malayalam
@@ -271,21 +301,43 @@ gymman/
 
 | Layer | What it contains | What it may import |
 |---|---|---|
+| `config/` | Keys, environment, tier limits | Nothing (plus `types/`) |
+| `theme/` | Design tokens | Nothing |
+| `types/` | TypeScript contracts | Nothing |
 | `engine/` | Pure math functions | Nothing from src/ |
-| `services/` | I/O: AI, storage, auth | `engine/`, `types/`, `theme/` (never) |
+| `services/` | I/O: AI, storage, auth | `engine/`, `types/`, `config/` |
 | `store/` | Global runtime state | `types/` |
 | `contexts/` | React Contexts for computed cross-module state | `services/`, `store/`, `engine/` |
 | `shared/` | Components, hooks, utils used by ≥ 2 modules | `theme/`, `types/`, `store/` |
-| `modules/` | All UI and feature logic | `services/`, `engine/`, `store/`, `contexts/`, `shared/`, `theme/`, `types/` |
-| `app/` | Navigation + Providers | `modules/`, `store/`, `contexts/` |
+| `modules/` | All UI and feature logic | `services/`, `engine/`, `store/`, `contexts/`, `shared/`, `theme/`, `types/`, `config/` |
+| `app/` | Navigation + Providers | `modules/`, `store/`, `contexts/`, `services/` |
 
 ---
 
-## Module-by-module breakdown
+## Module anatomy — the standard shape
+
+Every module follows the same pattern:
+
+```
+modules/feature/
+├── FeatureScreen.tsx        ← Owns the state, orchestrates the tabs/sections
+├── utils.ts                 ← (optional) helpers shared by the screen and its components
+├── components/              ← UI pieces only used inside this module
+│   └── SomeComponent.tsx
+└── index.ts                 ← The only exit point. Exports the screen, nothing else.
+```
+
+The screen file holds state and handlers; `components/` holds the presentational pieces it composes. A component's single-use helpers live inside the component file; helpers used by both the screen and a component go in the module's `utils.ts`. Nothing inside `components/` is ever imported from outside the module.
+
+`plan/` is the exception in shape only: it's a stack navigator, so it holds one sub-folder per stack screen (`home/`, `diet/`, `training/`, `calory-burn/`, `bloodwork/`, `review/`), and each sub-folder follows the standard shape.
+
+---
+
+## Module-by-module notes
 
 ### `modules/onboarding/`
 
-The first-launch flow. Runs once, then never again. Completely sealed — nothing outside touches it.
+The first-launch flow. Runs once, then never again (except Login, which the RootNavigator returns to after sign-out).
 
 **Screens in order:**
 ```
@@ -294,13 +346,11 @@ LanguageSelectionScreen → WelcomeScreen → LoginScreen → GoalDescriptionScr
 → GoalAnalysisScreen → StatsRevealScreen → ExecutionPlanScreen
 ```
 
-`utils/fitnessCalculations.ts` is an onboarding-only helper (BMR/TDEE for the reveal screen). `physicalStatsParser.ts` moved to `services/ai/` because it's used as an offline fallback parser inside `onboardingChat.ts`.
-
----
+All body-composition math comes straight from `engine/` (`computeBodyStats`, `classifyGoal`, `calcCalorieTarget`, `calcMacros`) — there is no onboarding-local calculation file. The AI helpers it uses all live in `services/ai/` (goalAnalysis, executionPlan, onboardingChat, onboardingCoach, statParser, physicalStatsParser).
 
 ### `modules/plan/`
 
-The Plan tab is a **stack** navigator, not a tab. `PlanScreen` is the root hub. Tapping a section card navigates deeper into the same stack. Everything reachable from the Plan tab is a sub-folder of `modules/plan/`.
+The Plan tab is a **stack** navigator, not a tab. `PlanScreen` is the root hub. Tapping a section card navigates deeper into the same stack.
 
 ```
 Plan tab → PlanNavigator (stack)
@@ -312,38 +362,19 @@ Plan tab → PlanNavigator (stack)
 └── SevenDay       → modules/plan/review/SevenDayScreen.tsx
 ```
 
-**Why Bloodwork is here, not its own top-level module:**
-Bloodwork is not a bottom tab. It's a screen you navigate to from PlanScreen. It belongs in `plan/` for the same reason `Diet` belongs in `plan/` — same navigator, same domain.
+**Why Bloodwork is here, not its own top-level module:** it's not a bottom tab; it's a screen you navigate to from PlanScreen. Same navigator, same domain.
 
-**Why the streak lives in `plan/home/` and not its own module:**
-The streak *UI* — the flames, the celebration modal, the streak detail sheet — is all rendered by and owned by `PlanScreen`. The streak *data* flows through `store/streak/` (so CaloryBurn and Training can write to it, and PlanHome can read it). No separate screens, no separate navigator. `plan/home/components/` holds all of it.
+**Why the streak lives in `plan/home/` and not its own module:** the streak *UI* — flames, celebration modal, detail sheet — is rendered and owned by `PlanScreen`. The streak *data* flows through `store/streak/`. No separate screens, no separate navigator.
 
-**Why the 7-day review is `plan/review/` and not `engine/weekly-review/`:**
-`engine/weekly-review/` contains the pure math. `plan/review/SevenDayScreen.tsx` is the UI that calls that math and displays it. The naming mirrors the relationship: `engine/` computes, `modules/` displays.
+**Why the 7-day review is `plan/review/` and not `engine/weekly-review/`:** `engine/weekly-review/` is the pure math; `plan/review/` is the UI that calls it and displays it. `engine/` computes, `modules/` displays.
 
----
+### `modules/coach/` vs the shared ChatInterface
 
-### `modules/progress/`
+`ChatView.tsx` and `ChatHistoryPanel.tsx` live inside `coach/components/` — not `shared/` — because only this module uses them. The `ChatInterface.tsx` in `shared/` is the generic, stateless chat bubble layout used by *both* the nutrition and trainer coach UIs. Note the diet module has its own `ChatHistoryPanel.tsx` too — same name, different storage backend (dietChatStorage vs masterChatStorage), each private to its module. The Coach screen also owns the voice features: mic input through `services/ai/whisper.ts`, spoken replies through expo-speech.
 
-Single screen. Daily body weight log + line chart. The chart component is extracted into `components/WeightChart.tsx` because it is complex enough to deserve its own file, even if only used once inside this module.
+### `modules/progress/`, `modules/photos/`, `modules/shop/`
 
----
-
-### `modules/photos/`
-
-Single screen. The entire feature — camera, gallery, grid, full-screen viewer — lives in one file. If it grows, extract components here. Today it does not need to.
-
----
-
-### `modules/coach/`
-
-Single screen. The Master AI Coach. `ChatView.tsx` lives inside `coach/components/` — not in `shared/` — because only this module uses it. The `ChatInterface.tsx` in `shared/` is the generic, stateless chat bubble layout used by *both* the nutrition coach UI and the trainer coach UI. `ChatView` is a stateful wrapper that connects to `masterCoachChat` specifically.
-
----
-
-### `modules/shop/`
-
-Single screen. Local product data, no external calls.
+Single-screen modules. Progress extracts `WeightChart` because the chart math deserves its own file. Photos keeps everything in one file (camera, gallery, grid, viewer) — extract components only when it grows. Shop is local product data with no external calls.
 
 ---
 
@@ -353,37 +384,66 @@ Each AI file has a distinct job and distinct system prompt. They never overlap.
 
 | File | Who calls it | What it does |
 |---|---|---|
-| `client.ts` | all other ai/ files | Groq API connection — swap providers by changing only this file |
+| `client.ts` | all other ai/ files + modules | Groq API connection — swap providers by changing only this file |
+| `rateLimiter.ts` | any screen that sends AI messages | Daily counters (AI messages, photo scans) checked against `config/subscriptionLimits.ts` |
+| `whisper.ts` | `modules/coach/` | Voice input: recorded m4a → Groq Whisper → transcript |
 | `nutritionCoach.ts` | `modules/plan/diet/` | Parses food, estimates macros, writes log actions, handles food photos |
-| `trainerCoach.ts` | `modules/plan/training/` | Builds routines, coaches form, handles progressive overload logic |
-| `masterCoach.ts` | `modules/coach/` | Full journey context, can propose changes to targets with user approval |
+| `trainerCoach.ts` | `modules/plan/training/` | Builds routines, coaches form, progressive overload logic |
+| `masterCoach.ts` | `modules/coach/` | Full journey context, can propose target changes with user approval |
 | `goalAnalysis.ts` | `modules/onboarding/` | 3-phase goal analysis: interpretation, reality check, prescription |
-| `executionPlan.ts` | `modules/onboarding/` | Generates personalised training + diet execution content for the final onboarding screen |
+| `executionPlan.ts` | `modules/onboarding/` | Generates personalised training + diet execution content |
 | `onboardingChat.ts` | `modules/onboarding/` | Structured questionnaire AI — collects physical stats one field at a time |
-| `onboardingCoach.ts` | `modules/onboarding/` | Acknowledgment AI — generates warm coach replies after each answer |
-| `statParser.ts` | `modules/onboarding/` | AI-based field parser (groqParseField) — used when precise structured parsing is needed |
-| `physicalStatsParser.ts` | `onboardingChat.ts` | Regex fallback parsers for when the API is down — extractName, extractAge, extractWeight, etc. |
+| `onboardingCoach.ts` | `modules/onboarding/` | Acknowledgment AI — warm coach replies after each answer |
+| `statParser.ts` | `modules/onboarding/` | AI-based field parser (groqParseField) for precise structured parsing |
+| `physicalStatsParser.ts` | `onboardingChat.ts` | Regex fallback parsers for when the API is down |
+
+One deliberate exception: `calory-burn/CaloryBurnScreen.tsx` keeps a small inline AI activity parser (system prompt + JSON extraction) instead of a services/ai file. It's ~10 lines, used by exactly one screen, and modules may call `aiChat` directly.
 
 ---
 
-## `services/storage/local/` — one file per data domain
+## Storage — how data persistence actually works
 
-The original architecture planned 3 files. The real app needs 14. That is not a mistake — it is correct design. Fine-grained files mean:
-- Reading `caloryBurnStorage.ts` tells you exactly what gets persisted for calory burn, with no noise from unrelated features.
+### The model (read this first)
+
+**One account, database-primary.** For a signed-in user, Supabase's `user_data` table (`user_id, domain, payload jsonb`) is the source of truth for every text domain — routines, diet logs, bloodwork, calory burn, photo metadata, progress, profile, targets. AsyncStorage is a **write-through cache**: it makes the app open instantly and tolerate brief offline stretches, but it is never authoritative and never needs conflict resolution — the server wins when reachable. Signed out (pre-login onboarding), AsyncStorage is all there is.
+
+There is **no sync engine**. An earlier push/pull/last-write-wins design (`services/sync/`) was built and deliberately removed as overcomplicated. Do not reintroduce it; the direct read/write model in `localEnvelope.ts` covers every case, including per-day keys (each day is just its own `domain` string).
+
+### `services/storage/localEnvelope.ts`
+
+The single primitive every domain file goes through. It handles, in one place:
+- **Cache keys scoped by userId** so two accounts on one device never see each other's data.
+- **"Cloud says empty" ≠ "cloud unreachable"** — a successful read that finds no row returns null and does *not* fall back to cache (this distinction fixed a real cross-account bug; the file's header comment tells the story).
+- **Offline pending-write queue** — a failed cloud write still lands in the local cache instantly (UI never sees a failure) and drains on the next successful call or app foreground. Queue entries are tagged per-userId.
+- **Legacy key migration** — old raw AsyncStorage keys are found once, migrated forward, and pushed to the cloud.
+
+### `services/storage/local/` — one file per data domain
+
+15 files, one per domain. That is deliberate design, not sprawl:
+- Reading `caloryBurnStorage.ts` tells you exactly what gets persisted for calory burn, with no noise.
 - A bug in diet storage cannot affect workout storage.
-- When you add a new feature, you add a new file — you do not modify an existing one.
+- Adding a feature means adding a file, not modifying one.
 
-The comments in the tree above group them by the module that owns them. This grouping is the natural reading order.
+Public function signatures stay domain-shaped (`loadTodayLog()`, `saveBodyWeight()`); the envelope is purely internal plumbing.
+
+### `services/storage/cloud/`
+
+Only two files: `client.ts` (the Supabase client singleton) and `photoCloud.ts` (the one true exception to "text goes through the envelope" — actual photo *bytes* upload to a private Storage bucket, premium/ultra only, automatic by tier).
+
+### Auth and entitlements
+
+- `services/auth/authService.ts` — Supabase email/Google/phone sign-in. Google needs an OAuth client ID in the Supabase dashboard; phone needs an SMS provider. Both code-complete, untested against live providers.
+- `app/providers/AuthProvider.tsx` — session context; gates rendering until the initial session check resolves; forces a clean remount on sign-out.
+- `app/providers/SubscriptionProvider.tsx` — reads tier from the `entitlements` table when signed in, falls back to the local dev-override tier otherwise. This is the seam a future Play Store IAP handler or Razorpay/UPI webhook writes into without touching the provider again.
+- `supabase/schema.sql` — the full table/RLS/bucket setup. Run manually once; not part of the app build.
 
 ---
 
 ## `contexts/GoalsContext.tsx`
 
-This is the bridge between **Calory Burn** and **Diet**.
+The bridge between **Calory Burn** and **Diet**. When Dynamic Mode is on, the user's diet calorie target changes throughout the day based on what they actually burned. Three screens consume it: `PlanScreen` (today's targets), `DietScreen` (calorie goal in the macros card), and `CaloryBurnScreen` (toggles dynamic mode and calls `refresh()` on every change).
 
-When Dynamic Mode is on, the user's diet calorie target changes throughout the day based on what they actually burned. Three screens consume this: `PlanScreen` (to display today's targets), `DietScreen` (to show the calorie goal in the macros card), and `CaloryBurnScreen` (to toggle and write dynamic mode).
-
-It is a React Context, not a Zustand slice, because it computes a derived value from multiple storage reads on each focus event — it does not need to be globally persistent between app restarts. It is provided at `MainTabNavigator` level, so it wraps exactly the three screens that need it.
+It's a React Context, not a store slice, because it computes a derived value from multiple storage reads on each focus event — it doesn't need to persist between app restarts. It is provided at `MainTabNavigator` level, wrapping exactly the screens that need it.
 
 ---
 
@@ -397,23 +457,22 @@ Something belongs in `shared/` if and only if **two or more unrelated modules** 
 - `Button.tsx`, `Card.tsx`, `Input.tsx`, `Modal.tsx` — universal primitives
 - All hooks and utils
 
-**Moved out of `shared/` (they had only one real user):**
-- `ChatView.tsx` → `modules/coach/components/` — only the Coach tab uses it
-- `TodayWorkoutView.tsx` → `modules/plan/training/components/` — only Training uses it
-- `HistoryView.tsx` → `modules/plan/training/components/` — only Training uses it
-- `TrainerIntroView.tsx` → `modules/plan/training/components/` — only Training uses it
+**Deliberately NOT in `shared/`:**
+- `ChatView.tsx`, `ChatHistoryPanel.tsx` → `modules/coach/components/` — only Coach uses them
+- `TrainerIntroView.tsx`, `TodayWorkoutView.tsx`, `HistoryView.tsx`, `RoutineDisplay.tsx`, `DayCard.tsx` → `modules/plan/training/components/`
+- Every tab/modal of diet, calory-burn, bloodwork, review → their own module's `components/`
+- `subscriptionLimits.ts` → `src/config/` — it's tier configuration, not UI, and `services/` needs it too (shared/ would be an upward import for a service)
 
 ---
 
-## `types/` — merged for clarity
-
-`workoutLog.ts` and `routine.ts` both describe training-domain data. They merge into `plan.ts`, alongside `FoodEntry`, `BurnActivity`, etc. One file per domain:
+## `types/` — one file per domain
 
 | File | Types it contains |
 |---|---|
-| `user.ts` | `UserProfile`, `OnboardingData`, `BodyMetrics`, `Goal`, `SubscriptionTier` |
-| `plan.ts` | `FoodEntry`, `Routine`, `RoutineDay`, `Exercise`, `WorkoutLog`, `WorkoutSet`, `BurnActivity` |
-| `coaching.ts` | `ChatMessage`, `ChatSession`, `CoachContext`, `ContextWindowConfig` |
+| `user.ts` | `UserProfile`, `OnboardingData`, `BodyMetrics`, `Goal`, `NutritionGoals`, `UserPhysicalStats` |
+| `plan.ts` | `FoodEntry`, `Routine`, `RoutineDay`, `Exercise`, `WorkoutLog`, `ActivityEntry`, `DayActivities`, `WeightLog` |
+| `coaching.ts` | `ChatMessage`, `ChatSession`, `DietChat`, `StoredDietMessage`, `CoachContext` |
+| `subscription.ts` | `SubscriptionTier` |
 | `shop.ts` | `Product`, `CartItem`, `Order`, `VettedBadge` |
 
 ---
@@ -422,19 +481,20 @@ Something belongs in `shared/` if and only if **two or more unrelated modules** 
 
 ```
 App.tsx
-└── RootNavigator
-    ├── OnboardingNavigator          (until onboarding is complete)
+└── RootNavigator                    (auth + onboarding gate)
+    ├── OnboardingNavigator          (until authenticated + onboarded;
+    │   │                             starts at Login if this device has seen an account before)
     │   ├── LanguageSelectionScreen
     │   ├── WelcomeScreen
     │   ├── LoginScreen
     │   ├── GoalDescriptionScreen
-    │   ├── OnboardingChatScreen     ← AI chat that collects physical stats
+    │   ├── OnboardingChatScreen
     │   ├── PhotoCaptureScreen
     │   ├── GoalAnalysisScreen
     │   ├── StatsRevealScreen
     │   └── ExecutionPlanScreen
     │
-    └── MainTabNavigator             (5 bottom tabs, after onboarding)
+    └── MainTabNavigator             (5 bottom tabs; provides GoalsContext)
         │
         ├── Plan tab → PlanNavigator (stack)
         │   ├── PlanHome      ← Dashboard: streak, targets, section cards
@@ -446,7 +506,7 @@ App.tsx
         │
         ├── Progress tab      ← Weight chart + daily log
         ├── Photos tab        ← Camera + grid + full-screen
-        ├── Coach tab         ← Master AI chat
+        ├── Coach tab         ← Master AI chat (voice in/out)
         └── Shop tab          ← Product grid
 ```
 
@@ -468,7 +528,7 @@ App.tsx
 | 7-day weekly review | `modules/plan/review/` |
 | Body weight chart or logging | `modules/progress/` |
 | Transformation photos | `modules/photos/` |
-| The master AI Coach | `modules/coach/` |
+| The master AI Coach (incl. voice) | `modules/coach/` |
 | The shop | `modules/shop/` |
 | Any body composition formula | `engine/body-metrics/` |
 | Any calorie calculation | `engine/nutrition/` |
@@ -477,13 +537,17 @@ App.tsx
 | Trainer AI system prompt | `services/ai/trainerCoach.ts` |
 | Master Coach personality | `services/ai/masterCoach.ts` |
 | Swap the AI provider for the whole app | `services/ai/client.ts` |
+| AI daily message / photo-scan limits | `services/ai/rateLimiter.ts` + `config/subscriptionLimits.ts` |
+| How any data is cached / synced to Supabase | `services/storage/localEnvelope.ts` |
 | How diet data is saved/loaded | `services/storage/local/dietLogStorage.ts` |
 | How workout data is saved/loaded | `services/storage/local/workoutStorage.ts` |
+| Sign in / sign up / sign out | `services/auth/authService.ts` + `app/providers/AuthProvider.tsx` |
 | Dynamic Mode ↔ Diet calorie link | `contexts/GoalsContext.tsx` |
-| Free vs premium feature limits | `shared/constants/subscriptionLimits.ts` |
+| Free vs premium feature limits | `config/subscriptionLimits.ts` |
 | The collapsible tab bar | `shared/components/CollapsibleTabBar.tsx` |
 | Colors, fonts, spacing | `src/theme/` |
 | API keys | `src/config/keys.ts` |
+| Database tables / RLS / buckets | `supabase/schema.sql` |
 | English copy | `locales/en/` |
 | Malayalam copy | `locales/ml/` |
 | Manglish copy | `locales/manglish/` |
