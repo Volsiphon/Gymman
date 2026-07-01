@@ -1,3 +1,13 @@
+/**
+ * services/storage/local/bloodworkStorage.ts
+ *
+ * Persists bloodwork log entries (blood panel results the user enters manually).
+ * Each log entry is a snapshot of metric values on a specific date (e.g. HbA1c 5.4,
+ * Testosterone 450). The Master AI Coach receives the latest bloodwork snapshot in
+ * its system prompt so it can give more personalised advice. The Bloodwork screen
+ * renders charts over time for each tracked metric.
+ */
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEY = 'gymman_bloodwork_logs';

@@ -1,3 +1,13 @@
+/**
+ * services/ai/physicalStatsParser.ts
+ *
+ * Regex-based fallback parsers for the onboarding questionnaire. When the Groq
+ * API is unavailable or rate-limited, onboardingChat.ts calls these to extract
+ * values from the user's raw text. Not as smart as the AI parser — can't handle
+ * unusual phrasing — but covers the common cases well enough to keep onboarding
+ * functional offline.
+ */
+
 import type { ActivityLevel } from '@/types/user';
 
 export function extractName(raw: string): string | null {

@@ -1,3 +1,11 @@
+/**
+ * modules/onboarding/index.ts
+ *
+ * Public export barrel for the onboarding module. OnboardingNavigator imports all
+ * its screens from here. Nothing inside screens/ should be imported directly from
+ * outside this module — always go through this barrel.
+ */
+
 export { LanguageSelectionScreen } from './screens/LanguageSelectionScreen';
 export { LoginScreen } from './screens/LoginScreen';
 export { WelcomeScreen } from './screens/WelcomeScreen';

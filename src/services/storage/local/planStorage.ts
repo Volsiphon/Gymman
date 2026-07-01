@@ -1,3 +1,13 @@
+/**
+ * services/storage/local/planStorage.ts
+ *
+ * Persists the user's active workout routine — the full Routine object including
+ * all days, exercises, sets, and reps. The AI trainer reads this on every chat
+ * session and can issue [PATCH] commands that this storage applies via the
+ * `applyPatchesToRoutine()` helper in trainerCoach.ts. The Training screen
+ * loads the routine on focus to display the current workout plan.
+ */
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Routine } from '@/types/plan';
 

@@ -1,3 +1,12 @@
+/**
+ * theme/typography.ts
+ *
+ * The app's type system. Use named styles (typography.body, typography.label, etc.)
+ * in StyleSheets — they're semantic, not size-based. Spread them in:
+ *   { ...typography.label, color: colors.text.muted }
+ * Font families must match the keys passed to useFonts() in App.tsx.
+ */
+
 import type { TextStyle } from 'react-native';
 
 // Font family name constants — must match the keys passed to useFonts() in App.tsx.

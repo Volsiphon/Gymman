@@ -1,3 +1,13 @@
+/**
+ * services/ai/statParser.ts
+ *
+ * AI-powered field parser for the onboarding questionnaire. When a regex in
+ * physicalStatsParser.ts can't extract a value — unusual phrasing, edge case,
+ * or a country name that needs normalising — this sends a focused Groq call
+ * to parse just that one field. Returns a typed result (value / skip / joke /
+ * off-topic / unclear) so the screen knows exactly how to respond.
+ */
+
 import { groqChat } from './client';
 import type { QuestionKey } from '@/types/user';
 

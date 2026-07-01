@@ -1,3 +1,12 @@
+/**
+ * modules/plan/home/PlaceholderDetailScreen.tsx
+ *
+ * A generic "coming soon" screen used as a temporary target for Plan sub-screens
+ * that haven't been built yet. Shows the screen name and a back button. When a
+ * real sub-screen is ready it replaces this in PlanNavigator.tsx — there should
+ * eventually be zero routes pointing here.
+ */
+
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

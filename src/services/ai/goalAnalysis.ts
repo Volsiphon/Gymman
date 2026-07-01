@@ -1,6 +1,27 @@
+/**
+ * services/ai/goalAnalysis.ts
+ *
+ * Runs the three-phase Goal Analysis shown after onboarding on the GoalAnalysis screen.
+ *
+ * Phase 1 — Interpretation: the AI reads the user's raw goal text and says what it
+ *   actually means in physical terms (e.g. "I want to look like Virat Kohli" becomes
+ *   a specific body fat and lean mass target).
+ *
+ * Phase 2 — Reality: honest assessment of where the user is right now, their
+ *   advantages, their challenges, and what must change.
+ *
+ * Phase 3 — Prescription: defines the specific optimised goal. If the goal is
+ *   biologically feasible, returns one target. If not (e.g. wants a physique that
+ *   requires PEDs), returns two options — an evidence-based option and a "pursue
+ *   the dream the smartest way" option.
+ *
+ * Each phase is a separate Groq call so the prompts stay focused and token usage is
+ * spread across three smaller requests rather than one massive one.
+ */
+
 import { groqChat } from './client';
 import type { BodyCompositionStats } from '@/engine/body-metrics';
-import type { UserProfile } from '@/services/storage/local/userProfileStorage';
+import type { UserProfile } from '@/types/user';
 
 // ─── Result types ─────────────────────────────────────────────────────────────
 

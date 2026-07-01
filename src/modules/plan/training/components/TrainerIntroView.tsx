@@ -1,3 +1,14 @@
+/**
+ * modules/plan/training/components/TrainerIntroView.tsx
+ *
+ * The "Trainer" tab inside TrainingScreen — the chat interface where the user
+ * builds and modifies their workout routine by talking to the AI trainer. Uses
+ * trainerCoach.ts which operates in two modes: builder mode (no routine exists yet,
+ * AI creates one from scratch) and modifier mode (routine exists, AI issues [PATCH]
+ * commands). After each AI reply, the routine in planStorage.ts is updated and the
+ * parent TrainingScreen re-renders TodayWorkoutView with the new plan.
+ */
+
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
@@ -21,16 +32,11 @@ import {
   applyPatchesToRoutine,
   PATCH_DONE_MARKER,
 } from '@/services/ai/trainerCoach';
-import type { ChatMessage } from '@/services/ai/client';
+import type { ChatMessage, SavedChat } from '@/types/coaching';
 import { saveRoutine, loadRoutines, updateRoutine } from '@/services/storage/local/planStorage';
 import { loadWorkoutLogs } from '@/services/storage/local/workoutStorage';
 import { saveRoutineChange } from '@/services/storage/local/historyStorage';
-import {
-  loadSavedChats,
-  upsertSavedChat,
-  deleteSavedChat,
-  type SavedChat,
-} from '@/services/storage/local/trainerChatStorage';
+import { loadSavedChats, upsertSavedChat, deleteSavedChat } from '@/services/storage/local/trainerChatStorage';
 import type { Routine, WorkoutLog } from '@/types/plan';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';

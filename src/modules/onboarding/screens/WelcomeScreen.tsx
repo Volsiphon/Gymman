@@ -1,3 +1,12 @@
+/**
+ * modules/onboarding/screens/WelcomeScreen.tsx
+ *
+ * A brief animated welcome screen shown after login, before the data collection
+ * chat begins. Sets the tone for the app — bold, motivational, Kerala-focused.
+ * Auto-advances to OnboardingChatScreen after the animation completes. No user
+ * interaction required; it's purely atmospheric.
+ */
+
 import React, { useEffect, useRef } from 'react';
 import {
   View,

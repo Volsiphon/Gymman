@@ -1,3 +1,13 @@
+/**
+ * modules/plan/calory-burn/CaloryBurnScreen.tsx
+ *
+ * The Calory Burn Plan sub-screen. Lets the user log physical activities (run, walk,
+ * cycle, swim, etc.) with duration and intensity; the engine calculates the estimated
+ * calorie burn for each. Also has the Dynamic Mode toggle: when on, the total burn
+ * for the day is added to the user's calorie target via GoalsContext, so the diet
+ * allowance rises automatically to cover the extra energy expenditure.
+ */
+
 import React, { useState, useCallback } from 'react';
 import {
   View,
@@ -26,11 +36,10 @@ import {
   loadTodayActivities,
   saveTodayActivities,
   loadActivityHistory,
-  type ActivityEntry,
-  type DayActivities,
 } from '@/services/storage/local/caloryBurnStorage';
+import type { ActivityEntry, DayActivities } from '@/types/plan';
 import { loadUserProfile } from '@/services/storage/local/userProfileStorage';
-import { groqChat } from '@/services/ai/client';
+import { aiChat } from '@/services/ai/client';
 import { useGoals } from '@/contexts/GoalsContext';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
@@ -55,7 +64,7 @@ const AI_SYSTEM =
   'You are a calorie burn estimator. Given a description of physical activities, extract each activity and estimate calories burned for an average adult (~75 kg, moderate effort). Respond with ONLY a valid JSON array: [{"name":"...","caloriesBurned":0}]. One entry per distinct activity. If no valid activity is described, return [].';
 
 async function parseActivities(text: string): Promise<Array<{ name: string; caloriesBurned: number }>> {
-  const reply = await groqChat([
+  const reply = await aiChat([
     { role: 'system', content: AI_SYSTEM },
     { role: 'user', content: text },
   ]);
@@ -274,12 +283,20 @@ function TodayTab({
                 </View>
               </View>
               {dynamicTarget !== null && (
-                <View style={tt.targetRow}>
-                  <Ionicons name="restaurant-outline" size={13} color={colors.text.muted} />
-                  <Text style={tt.targetText}>
-                    Your diet target today:{' '}
-                    <Text style={tt.targetNum}>{dynamicTarget.toLocaleString()} kcal</Text>
-                  </Text>
+                <View style={tt.targetSection}>
+                  <View style={tt.targetRow}>
+                    <Ionicons name="restaurant-outline" size={13} color={colors.text.muted} />
+                    <Text style={tt.targetText}>
+                      Your diet target today:{' '}
+                      <Text style={tt.targetNum}>{dynamicTarget.toLocaleString()} kcal</Text>
+                    </Text>
+                  </View>
+                  {goalOffset !== 0 && (
+                    <Text style={tt.offsetHint}>
+                      {dynamicMaintenance?.toLocaleString()} maintenance{' '}
+                      {goalOffset > 0 ? `+ ${goalOffset}` : `− ${Math.abs(goalOffset)}`} kcal goal {goalOffset > 0 ? 'surplus' : 'deficit'}
+                    </Text>
+                  )}
                 </View>
               )}
             </View>
@@ -389,9 +406,11 @@ const tt = StyleSheet.create({
   maintPillLabel: { ...typography.caption, color: colors.text.muted },
   maintPillVal:   { ...typography.subhead, color: colors.text.primary, fontWeight: '600', lineHeight: 22 },
   plus:           { ...typography.subhead, color: colors.text.muted, fontWeight: '600' },
-  targetRow:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border.subtle },
+  targetSection:  { gap: 4, paddingTop: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border.subtle },
+  targetRow:      { flexDirection: 'row', alignItems: 'center', gap: 6 },
   targetText:     { ...typography.caption, color: colors.text.muted, flex: 1 },
   targetNum:      { ...typography.caption, color: colors.text.secondary, fontWeight: '600' },
+  offsetHint:     { ...typography.caption, color: colors.text.disabled, paddingLeft: 19 },
 
   // Section
   section:       { gap: 8 },

@@ -1,8 +1,17 @@
+/**
+ * services/storage/local/caloryBurnStorage.ts
+ *
+ * Persists two things: the per-day activity log (runs, walks, cycling, etc. that the
+ * user logs to earn a calorie burn) and the Dynamic Mode flag (on/off toggle).
+ *
+ * When Dynamic Mode is on, GoalsContext reads the burn for today and adds it to the
+ * baseline calorie target so the diet allowance rises automatically with activity.
+ * Each day's activities are stored under a YYYY-MM-DD key so they never bleed across days.
+ */
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ActivityEntry, DayActivities } from '@/types/plan';
 
-// ActivityEntry and DayActivities are now defined in @/types/plan — re-exported here for backwards compatibility.
-export type { ActivityEntry, DayActivities } from '@/types/plan';
 
 const KEY_DYNAMIC = 'gymman_calburn_dynamic';
 const KEY_ACTS    = 'gymman_calburn_acts';

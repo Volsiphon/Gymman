@@ -1,3 +1,13 @@
+/**
+ * engine/body-metrics/body-fat.ts
+ *
+ * Estimates body fat percentage using one of two methods:
+ *   1. US Navy tape method — more accurate, uses neck + waist (+ hip for females).
+ *   2. BMI-based estimate — less accurate, used when the user skipped measurements.
+ * The result also includes a category label (Athletic / Fit / Average / Above average)
+ * and a color (success / gold / danger) for the UI.
+ */
+
 import type { Sex } from './bmr';
 
 export type BFCategory = 'Athletic' | 'Fit' | 'Average' | 'Above average';

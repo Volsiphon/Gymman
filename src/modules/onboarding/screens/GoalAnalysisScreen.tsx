@@ -1,3 +1,14 @@
+/**
+ * modules/onboarding/screens/GoalAnalysisScreen.tsx
+ *
+ * The AI-powered goal analysis step in onboarding. Takes the user's stated goal
+ * (from GoalDescriptionScreen) and their physical stats (from OnboardingChatScreen)
+ * and runs them through goalAnalysis.ts — three sequential Groq API calls that
+ * interpret the goal, run a realism check against biological limits, and prescribe
+ * either a direct plan or an A/B choice. Shows a typing animation while the AI
+ * thinks, then transitions to StatsRevealScreen with the analysis results.
+ */
+
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -20,7 +31,7 @@ import {
   profileToStats,
   saveUserProfile,
 } from '@/services/storage/local/userProfileStorage';
-import type { UserProfile } from '@/services/storage/local/userProfileStorage';
+import type { UserProfile } from '@/types/user';
 import type { BodyCompositionStats } from '@/engine/body-metrics';
 import {
   runPhase1,

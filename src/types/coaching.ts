@@ -1,3 +1,12 @@
+/**
+ * types/coaching.ts
+ *
+ * Types for AI chat conversations across the app.
+ * ChatMessage is the raw format the Groq API expects for every AI call.
+ * The Diet and Trainer coaches each have their own storage formats (DietChat, SavedChat)
+ * because they persist differently — diet resets daily, trainer chats accumulate.
+ */
+
 // ─── AI chat message (used by all AI service calls) ──────────────────────────
 
 export type ChatMessage = {

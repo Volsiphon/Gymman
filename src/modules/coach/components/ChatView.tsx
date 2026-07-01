@@ -1,3 +1,13 @@
+/**
+ * modules/coach/components/ChatView.tsx
+ *
+ * Stateful chat component specific to the Master Coach screen. Manages the message
+ * array, the "typing…" indicator, and the send flow (calls masterCoach.ts, appends
+ * the AI reply). Unlike the generic ChatInterface in shared/, this component knows
+ * about the coach's conversation format and injects bloodwork context into the
+ * first message. Lives inside the coach module because only CoachScreen uses it.
+ */
+
 import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
@@ -11,12 +21,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import type { ChatMessage } from '@/services/ai/client';
+import type { ChatMessage } from '@/types/coaching';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 
-interface DisplayMessage {
+export interface DisplayMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
@@ -27,6 +37,10 @@ interface Props {
   accent?: string;
   welcomeMessage?: string;
   placeholder?: string;
+  /** Pre-populate with a saved conversation (no welcome shown when provided and non-empty) */
+  initialMessages?: DisplayMessage[];
+  /** Called with the full message list after every new exchange */
+  onMessagesChange?: (msgs: DisplayMessage[]) => void;
 }
 
 export function ChatView({
@@ -34,12 +48,17 @@ export function ChatView({
   accent = colors.primary,
   welcomeMessage,
   placeholder = 'Message…',
+  initialMessages,
+  onMessagesChange,
 }: Props) {
-  const [messages, setMessages] = useState<DisplayMessage[]>(
-    welcomeMessage
-      ? [{ id: 'welcome', role: 'assistant', content: welcomeMessage }]
-      : [],
-  );
+  const initialState: DisplayMessage[] =
+    initialMessages && initialMessages.length > 0
+      ? initialMessages
+      : welcomeMessage
+        ? [{ id: 'welcome', role: 'assistant', content: welcomeMessage }]
+        : [];
+
+  const [messages, setMessages] = useState<DisplayMessage[]>(initialState);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const listRef = useRef<FlatList>(null);
@@ -57,23 +76,27 @@ export function ChatView({
     try {
       const history: ChatMessage[] = next.map((m) => ({ role: m.role, content: m.content }));
       const reply = await onSend(history);
-      setMessages((prev) => [
-        ...prev,
+      const withReply: DisplayMessage[] = [
+        ...next,
         { id: `a-${Date.now()}`, role: 'assistant', content: reply },
-      ]);
+      ];
+      setMessages(withReply);
+      onMessagesChange?.(withReply);
     } catch {
-      setMessages((prev) => [
-        ...prev,
+      const withErr: DisplayMessage[] = [
+        ...next,
         {
           id: `err-${Date.now()}`,
           role: 'assistant',
           content: "Couldn't reach the server. Check your connection and try again.",
         },
-      ]);
+      ];
+      setMessages(withErr);
+      onMessagesChange?.(withErr);
     } finally {
       setLoading(false);
     }
-  }, [input, loading, messages, onSend]);
+  }, [input, loading, messages, onSend, onMessagesChange]);
 
   const canSend = input.trim().length > 0 && !loading;
 

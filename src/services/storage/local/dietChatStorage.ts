@@ -1,8 +1,15 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { StoredDietMessage, DietChat } from '@/types/coaching';
+/**
+ * services/storage/local/dietChatStorage.ts
+ *
+ * Persists the history of diet chat conversations — one DietChat per session,
+ * up to 50 stored. Each chat has an ID, a title, a timestamp, and the full
+ * message thread. This lets the user scroll back and see what the AI recommended
+ * in past sessions. The most recent chat is at index 0.
+ */
 
-// StoredDietMessage and DietChat are now defined in @/types/coaching — re-exported here for backwards compatibility.
-export type { StoredDietMessage, DietChat } from '@/types/coaching';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { DietChat } from '@/types/coaching';
+
 
 const KEY      = '@gymman:dietChats';
 const MAX_CHATS = 50;

@@ -1,3 +1,16 @@
+/**
+ * services/ai/onboardingChat.ts
+ *
+ * Orchestrates the onboarding questionnaire chat. Each user message is sent to
+ * Groq with a large structured prompt that tells the AI which question is active,
+ * what's already been collected, and what JSON format to return. The AI replies
+ * with an action object: proceed (got the value), skip (user skipped an optional
+ * field), correction (user corrected an earlier answer), unclear, or off-topic.
+ *
+ * localFallback() runs when Groq is unavailable — it tries the regex parsers from
+ * physicalStatsParser.ts and returns a minimal result if they match.
+ */
+
 import { groqChat, type ChatMessage } from './client';
 import type { UserPhysicalStats, QuestionKey } from '@/types/user';
 import {

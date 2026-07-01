@@ -1,3 +1,13 @@
+/**
+ * modules/progress/ProgressScreen.tsx
+ *
+ * The Progress bottom tab. Shows a line chart of the user's body weight over time
+ * (loaded from bodyWeightStorage.ts), with a "Log Today's Weight" input at the top.
+ * The chart automatically scales to the data range and highlights the trend line.
+ * This screen is the primary visual feedback loop — the user can see week-by-week
+ * whether they're on track toward their goal weight.
+ */
+
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,
@@ -8,10 +18,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { MainTabParamList } from '@/app/navigation/types';
-import {
-  saveBodyWeight, loadBodyWeightLogs, getTodayLog,
-  type WeightLog,
-} from '@/services/storage/local/bodyWeightStorage';
+import { saveBodyWeight, loadBodyWeightLogs, getTodayLog } from '@/services/storage/local/bodyWeightStorage';
+import type { WeightLog } from '@/types/plan';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';

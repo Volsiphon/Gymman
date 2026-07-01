@@ -1,3 +1,14 @@
+/**
+ * modules/plan/review/SevenDayScreen.tsx
+ *
+ * The 7-Day Weekly Review screen. Loads the past 7 body weight logs and the
+ * current nutrition plan, passes them to the weekly-review engine (analyzeWeek),
+ * and displays the analysis: actual vs predicted weight change, whether water
+ * retention was detected, and the calibrated real maintenance calories. If the
+ * user accepts the recalibration, adjustPlan() updates the calorie target and
+ * saves it via userProfileStorage so next week starts from a more accurate baseline.
+ */
+
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';

@@ -1,4 +1,23 @@
-import { groqChat, type ChatMessage } from './client';
+/**
+ * services/ai/trainerCoach.ts
+ *
+ * The Training Coach AI service. Two operating modes:
+ *
+ * 1. Builder mode (trainerCoachChat): Used when the user has no routine yet.
+ *    The AI gathers info (days, equipment, experience, injuries) and builds a
+ *    complete 7-day routine. When the routine is finalised, the AI's reply includes
+ *    [ROUTINE_READY], which triggers the screen to parse and save the routine.
+ *
+ * 2. Modifier mode (routineCoachChat): Used when a routine already exists. The AI
+ *    can see the current routine and workout history. When it makes changes, it
+ *    uses [PATCH op=update/swap/add/remove ...] commands. applyPatchesToRoutine()
+ *    applies those patches surgically without replacing the whole routine.
+ *
+ * parseRoutineFromText() is the markdown parser that converts the AI's formatted
+ * routine output (bold day headers, bullet exercises) into the Routine data structure.
+ */
+
+import { aiChat, type ChatMessage } from './client';
 import type { Routine, RoutineDay, Exercise, WorkoutLog } from '@/types/plan';
 
 // ─── Patch types ──────────────────────────────────────────────────────────────
@@ -308,7 +327,7 @@ export function parseRoutineFromText(text: string): RoutineDay[] {
 // ─── Chat functions ───────────────────────────────────────────────────────────
 
 export async function trainerCoachChat(history: ChatMessage[]): Promise<string> {
-  return groqChat([{ role: 'system', content: BUILD_SYSTEM }, ...history]);
+  return aiChat([{ role: 'system', content: BUILD_SYSTEM }, ...history]);
 }
 
 export async function routineCoachChat(
@@ -377,5 +396,5 @@ Only use the full routine format + [ROUTINE_READY] if the user is asking for a c
 [CHANGE_SUMMARY: ...]
 [ROUTINE_READY]`;
 
-  return groqChat([{ role: 'system', content: system }, ...history]);
+  return aiChat([{ role: 'system', content: system }, ...history]);
 }

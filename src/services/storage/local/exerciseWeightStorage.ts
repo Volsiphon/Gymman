@@ -1,3 +1,12 @@
+/**
+ * services/storage/local/exerciseWeightStorage.ts
+ *
+ * Persists the last-used weight per exercise (stored as a string, e.g. "60 kg").
+ * When the user opens the TodayWorkoutView to log a set, the weight field pre-fills
+ * with whatever they used last time for that exercise, so they don't have to type
+ * it from scratch every session. Keyed by exercise name.
+ */
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEY = '@gymman:exerciseWeights';

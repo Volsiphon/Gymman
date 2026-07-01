@@ -1,3 +1,10 @@
+/**
+ * types/plan.ts
+ *
+ * Types for everything inside the Plan tab: training routines and workout logs,
+ * calory burn activity entries, body weight progress entries, and transformation photos.
+ */
+
 // ─── Routine ──────────────────────────────────────────────────────────────────
 
 export interface Exercise {
@@ -80,4 +87,5 @@ export type PhotoEntry = {
   uri: string;
   date: string;      // YYYY-MM-DD
   timestamp: number;
+  section: string;   // defaults to 'General'
 };

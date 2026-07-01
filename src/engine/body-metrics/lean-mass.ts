@@ -1,3 +1,12 @@
+/**
+ * engine/body-metrics/lean-mass.ts
+ *
+ * Calculates lean body mass (everything that isn't fat), fat mass, FFMI
+ * (Fat-Free Mass Index — a density score for how much muscle you carry relative to
+ * your height), and a plain-English build description. FFMI is more useful than
+ * BMI for athletes because it specifically measures muscle, not total weight.
+ */
+
 import type { Sex } from './bmr';
 
 export interface LeanMassResult {

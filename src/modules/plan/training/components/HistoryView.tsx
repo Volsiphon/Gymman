@@ -1,3 +1,12 @@
+/**
+ * modules/plan/training/components/HistoryView.tsx
+ *
+ * The "History" tab inside TrainingScreen. Shows the chronological log of every
+ * change the AI trainer has made to the user's workout routine — exercise swaps,
+ * volume increases, deload weeks, etc. Data comes from historyStorage.ts. This
+ * gives the user full transparency into how their plan has evolved over time.
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
   View,

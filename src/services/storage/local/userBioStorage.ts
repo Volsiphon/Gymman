@@ -1,3 +1,12 @@
+/**
+ * services/storage/local/userBioStorage.ts
+ *
+ * Persists a lightweight UserBio snapshot — the subset of the full UserProfile
+ * used by screens that only need the user's name, sex, age, and weight (not the
+ * full goals, measurements, and history). Avoids loading the entire profile object
+ * for simple display purposes like greeting the user by name.
+ */
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEY = 'gymman_user_bio';

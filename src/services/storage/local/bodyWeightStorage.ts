@@ -1,8 +1,15 @@
+/**
+ * services/storage/local/bodyWeightStorage.ts
+ *
+ * Persists body weight log entries over time. Each WeightLog has a date and a
+ * weight in kg. The Progress screen charts these entries to show the user's
+ * weight trend, and the weekly review engine reads the last 7 entries to
+ * calculate whether the user is losing/gaining at the predicted rate.
+ */
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { WeightLog } from '@/types/plan';
 
-// WeightLog is now defined in @/types/plan — re-exported here for backwards compatibility.
-export type { WeightLog } from '@/types/plan';
 
 const KEY = 'gymman_body_weight_logs';
 

@@ -1,3 +1,12 @@
+/**
+ * theme/colors.ts
+ *
+ * The app's entire color system lives here. Never use raw hex strings in component
+ * files — always import from this file. The internal palette (p) maps names to hex
+ * values and is private. Only the semantic token object (colors.primary, colors.bg.card,
+ * colors.text.muted, etc.) is exported — that way changing a color here updates everywhere.
+ */
+
 // Internal palette — raw hex values, not exported.
 const p = {
   // ── App surfaces ───────────────────────────────────────────────
@@ -16,8 +25,9 @@ const p = {
   accent: '#C8FF3D',
 
   // ── Semantic ───────────────────────────────────────────────────
-  green:  '#22C55E',
-  coral:  '#FF5E5B',
+  green:   '#22C55E',
+  coral:   '#FF5E5B',
+  crimson: '#C53030',
   blue:   '#64B5F6',
   gold:   '#EAB308',
   amber:  '#FCD34D',
@@ -51,6 +61,9 @@ export const colors = {
 
   danger:      p.coral,
   dangerMuted: 'rgba(255,94,91,0.12)',
+
+  crimson:      p.crimson,
+  crimsonMuted: 'rgba(197,48,48,0.12)',
 
   info:      p.blue,
   infoMuted: 'rgba(100,181,246,0.12)',

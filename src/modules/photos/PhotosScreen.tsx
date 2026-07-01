@@ -1,7 +1,18 @@
+/**
+ * modules/photos/PhotosScreen.tsx
+ *
+ * Transformation photos with tier-gated sections. A pill bar at the top lets
+ * users switch between named sections (e.g. General, Chest, Back). Free users
+ * are limited to "General"; Premium users can have up to 5 sections; Ultra
+ * users can create as many as they want. Long-pressing a custom pill deletes
+ * that section (photos in it move back to General).
+ */
+
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ScrollView,
+  View, Text, TouchableOpacity, StyleSheet,
   Image, Modal, Dimensions, Alert, FlatList,
+  ScrollView, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -11,8 +22,11 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { MainTabParamList } from '@/app/navigation/types';
 import {
   savePhoto, loadPhotos, deletePhoto,
-  type PhotoEntry,
+  loadSections, addSection, deleteSection,
 } from '@/services/storage/local/photoStorage';
+import type { PhotoEntry } from '@/types/plan';
+import { useSubscription } from '@/app/providers/SubscriptionProvider';
+import { SUBSCRIPTION_LIMITS } from '@/shared/constants/subscriptionLimits';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -34,12 +48,78 @@ function fmtDate(iso: string): string {
 
 export function PhotosScreen(_: Props) {
   const insets = useSafeAreaInsets();
-  const [photos, setPhotos]     = useState<PhotoEntry[]>([]);
-  const [viewer, setViewer]     = useState<PhotoEntry | null>(null);
+  const { tier } = useSubscription();
 
-  useFocusEffect(useCallback(() => {
-    loadPhotos().then(setPhotos);
-  }, []));
+  const [photos, setPhotos]       = useState<PhotoEntry[]>([]);
+  const [sections, setSections]   = useState<string[]>(['General']);
+  const [activeSection, setActive] = useState('General');
+  const [viewer, setViewer]       = useState<PhotoEntry | null>(null);
+  const [addModal, setAddModal]   = useState(false);
+  const [newName, setNewName]     = useState('');
+
+  const sectionLimit = SUBSCRIPTION_LIMITS[tier].photoSections;
+  const canAddSection = sections.length < sectionLimit;
+
+  const refresh = useCallback(async () => {
+    const [s, p] = await Promise.all([loadSections(), loadPhotos(activeSection)]);
+    setSections(s);
+    setPhotos(p);
+  }, [activeSection]);
+
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+
+  async function switchSection(s: string) {
+    setActive(s);
+    const p = await loadPhotos(s);
+    setPhotos(p);
+  }
+
+  async function handleAddSection() {
+    if (!canAddSection) {
+      if (tier === 'free') {
+        Alert.alert('Upgrade to Premium', 'Free users can only use the General section. Upgrade to Premium to create up to 5 sections.');
+      } else {
+        Alert.alert('Section limit reached', 'You have reached the maximum number of sections for your plan.');
+      }
+      return;
+    }
+    setNewName('');
+    setAddModal(true);
+  }
+
+  async function confirmAddSection() {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    const updated = await addSection(trimmed);
+    setSections(updated);
+    setAddModal(false);
+    switchSection(trimmed);
+  }
+
+  async function handleLongPressSection(name: string) {
+    if (name === 'General') return;
+    Alert.alert(
+      `Delete "${name}"?`,
+      'Photos in this section will be moved to General.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive',
+          onPress: async () => {
+            // Reassign photos to General
+            const sectPhotos = await loadPhotos(name);
+            await Promise.all(sectPhotos.map(async p => {
+              await deletePhoto(p.id);
+              await savePhoto(p.uri, 'General');
+            }));
+            const updated = await deleteSection(name);
+            setSections(updated);
+            switchSection('General');
+          },
+        },
+      ],
+    );
+  }
 
   async function pickFromGallery() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -48,13 +128,11 @@ export function PhotosScreen(_: Props) {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.85,
-      allowsMultipleSelection: false,
+      mediaTypes: 'images', quality: 0.85, allowsMultipleSelection: false,
     });
     if (!result.canceled && result.assets[0]) {
-      await savePhoto(result.assets[0].uri);
-      loadPhotos().then(setPhotos);
+      await savePhoto(result.assets[0].uri, activeSection);
+      refresh();
     }
   }
 
@@ -64,13 +142,10 @@ export function PhotosScreen(_: Props) {
       Alert.alert('Permission needed', 'Allow camera access in Settings.');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.85,
-    });
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 0.85 });
     if (!result.canceled && result.assets[0]) {
-      await savePhoto(result.assets[0].uri);
-      loadPhotos().then(setPhotos);
+      await savePhoto(result.assets[0].uri, activeSection);
+      refresh();
     }
   }
 
@@ -81,8 +156,7 @@ export function PhotosScreen(_: Props) {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
           await deletePhoto(id);
-          const updated = await loadPhotos();
-          setPhotos(updated);
+          refresh();
           setViewer(null);
         },
       },
@@ -104,6 +178,38 @@ export function PhotosScreen(_: Props) {
             <Ionicons name="camera" size={20} color={colors.text.inverse} />
           </TouchableOpacity>
         </View>
+      </View>
+
+      {/* Section pill bar */}
+      <View style={s.pillRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.pillScroll}
+        >
+          {sections.map(sec => (
+            <TouchableOpacity
+              key={sec}
+              style={[s.pill, activeSection === sec && s.pillActive]}
+              activeOpacity={0.75}
+              onPress={() => switchSection(sec)}
+              onLongPress={() => handleLongPressSection(sec)}
+            >
+              <Text style={[s.pillText, activeSection === sec && s.pillTextActive]}>
+                {sec}
+              </Text>
+            </TouchableOpacity>
+          ))}
+
+          {/* Add section button */}
+          <TouchableOpacity style={s.pillAdd} activeOpacity={0.75} onPress={handleAddSection}>
+            <Ionicons
+              name="add"
+              size={16}
+              color={canAddSection ? colors.primary : colors.text.disabled}
+            />
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
       {hasPhotos ? (
@@ -153,7 +259,6 @@ export function PhotosScreen(_: Props) {
           {viewer && (
             <>
               <Image source={{ uri: viewer.uri }} style={s.viewerImg} resizeMode="contain" />
-
               <View style={[s.viewerTop, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity style={s.viewerIconBtn} onPress={() => setViewer(null)}>
                   <Ionicons name="close" size={24} color={colors.white} />
@@ -166,6 +271,41 @@ export function PhotosScreen(_: Props) {
             </>
           )}
         </View>
+      </Modal>
+
+      {/* Add section modal */}
+      <Modal visible={addModal} transparent animationType="fade" onRequestClose={() => setAddModal(false)}>
+        <KeyboardAvoidingView
+          style={s.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>New section</Text>
+            <TextInput
+              style={s.modalInput}
+              placeholder="e.g. Chest, Back, Legs…"
+              placeholderTextColor={colors.text.muted}
+              value={newName}
+              onChangeText={setNewName}
+              autoFocus
+              maxLength={24}
+              returnKeyType="done"
+              onSubmitEditing={confirmAddSection}
+            />
+            <View style={s.modalBtns}>
+              <TouchableOpacity style={s.modalCancel} onPress={() => setAddModal(false)}>
+                <Text style={s.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.modalConfirm, !newName.trim() && s.modalConfirmDisabled]}
+                onPress={confirmAddSection}
+                disabled={!newName.trim()}
+              >
+                <Text style={s.modalConfirmText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -189,6 +329,34 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   cameraBtn: { backgroundColor: colors.primary, borderColor: colors.primary },
+
+  // Section pills
+  pillRow: {
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle,
+  },
+  pillScroll: {
+    paddingHorizontal: spacing.screenPadding,
+    paddingVertical: spacing.sm,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    alignItems: 'center',
+  },
+  pill: {
+    paddingHorizontal: 14, paddingVertical: 6,
+    borderRadius: radius.full,
+    backgroundColor: colors.bg.card,
+    borderWidth: 1, borderColor: colors.border.default,
+  },
+  pillActive: {
+    backgroundColor: colors.primary, borderColor: colors.primary,
+  },
+  pillText: { ...typography.footnote, color: colors.text.secondary },
+  pillTextActive: { color: colors.text.inverse, fontWeight: '600' },
+  pillAdd: {
+    width: 30, height: 30, borderRadius: radius.full,
+    backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default,
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   // Grid
   grid: { padding: spacing.screenPadding, gap: CELL_GAP, paddingBottom: spacing.xl },
@@ -241,4 +409,30 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center',
   },
   viewerDate: { ...typography.subhead, color: colors.white },
+
+  // Add section modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: spacing.screenPadding },
+  modalCard: {
+    backgroundColor: colors.bg.card, borderRadius: radius.card,
+    padding: spacing.lg, gap: spacing.md,
+    borderWidth: 1, borderColor: colors.border.default,
+  },
+  modalTitle: { ...typography.title3, color: colors.text.primary },
+  modalInput: {
+    height: 44, borderRadius: radius.input,
+    backgroundColor: colors.bg.app, borderWidth: 1, borderColor: colors.border.default,
+    paddingHorizontal: spacing.md, ...typography.body, color: colors.text.primary,
+  },
+  modalBtns: { flexDirection: 'row', gap: spacing.sm },
+  modalCancel: {
+    flex: 1, height: 44, alignItems: 'center', justifyContent: 'center',
+    borderRadius: radius.button, borderWidth: 1, borderColor: colors.border.default,
+  },
+  modalCancelText: { ...typography.bodyMedium, color: colors.text.secondary },
+  modalConfirm: {
+    flex: 1, height: 44, alignItems: 'center', justifyContent: 'center',
+    borderRadius: radius.button, backgroundColor: colors.primary,
+  },
+  modalConfirmDisabled: { opacity: 0.4 },
+  modalConfirmText: { ...typography.bodyMedium, color: colors.text.inverse },
 });

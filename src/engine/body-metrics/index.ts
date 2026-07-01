@@ -1,3 +1,13 @@
+/**
+ * engine/body-metrics/index.ts
+ *
+ * Public API for the body-metrics engine. The main entry point for screens is
+ * computeBodyStats() — pass in a user's measurements and get back a complete
+ * body composition profile (BMR, TDEE, body fat %, lean mass, FFMI, build label)
+ * in a single call. Individual calculation functions are also exported for cases
+ * where you only need one number.
+ */
+
 export type { Sex } from './bmr';
 export { calcBMR } from './bmr';
 export type { ActivityLevel } from './tdee';

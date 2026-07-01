@@ -1,3 +1,13 @@
+/**
+ * modules/onboarding/screens/PhotoCaptureScreen.tsx
+ *
+ * Optional onboarding step where the user can take or upload a "before" photo to
+ * establish a visual baseline for their transformation journey. The photo is saved
+ * via photoStorage.ts. The user can skip this screen entirely — it does not block
+ * progress to GoalAnalysisScreen. Skipping just means no before-photo in the
+ * Photos tab's first entry.
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,

@@ -1,3 +1,12 @@
+/**
+ * services/storage/local/dietLogStorage.ts
+ *
+ * Persists today's food log — the list of meals and their macros that the user
+ * (or the AI coach) has added today. The log is date-keyed: if you load it on a
+ * different day from when it was saved, you get an empty array. This is intentional
+ * — diet logging is always for today only; historical data lives in dietChatStorage.ts.
+ */
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { LogItem } from '@/services/ai/nutritionCoach';
 

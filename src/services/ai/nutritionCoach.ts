@@ -1,4 +1,22 @@
-import { groqChat, type ChatMessage } from './client';
+/**
+ * services/ai/nutritionCoach.ts
+ *
+ * The Diet Coach AI service. Two responsibilities:
+ *
+ * 1. System prompt builder (buildNutritionSystem): Generates a dynamic system prompt
+ *    that includes today's live food log and macro progress. This is rebuilt on every
+ *    message so the AI always sees the current log state — it knows what's already
+ *    been logged and can suggest meals that fit the remaining calories.
+ *
+ * 2. Action parser (parseDietActions / stripDietActions): The AI embeds structured
+ *    [DIET:ADD ...], [DIET:REMOVE ...], [DIET:UPDATE ...], [DIET:CLEAR] commands in
+ *    its reply. The parser extracts these and the screen applies them as mutations to
+ *    today's food log. This is how the AI controls the log — it "speaks" in commands.
+ *
+ * Also exports VISION_SYSTEM for food photo analysis via groqVisionChat().
+ */
+
+import { aiChat, type ChatMessage } from './client';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -179,5 +197,5 @@ export async function nutritionCoachChat(
   log: LogItem[],
   goals: { calories: number; protein: number; carbs: number; fats: number },
 ): Promise<string> {
-  return groqChat([{ role: 'system', content: buildNutritionSystem(log, goals) }, ...history]);
+  return aiChat([{ role: 'system', content: buildNutritionSystem(log, goals) }, ...history]);
 }

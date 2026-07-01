@@ -1,3 +1,12 @@
+/**
+ * engine/goal-engine/realism-check.ts
+ *
+ * Checks whether a user's weight-change goal is biologically achievable in the
+ * timeframe they want. Used by the GoalAnalysis screen to decide whether to show
+ * one optimised goal or an A/B choice (feasible path vs. aspirational path).
+ * The limits here are for natural athletes — no steroids, no crash dieting.
+ */
+
 // Conservative upper bounds on achievable body change rates for natural athletes.
 const MAX_FAT_LOSS_KG_PER_WEEK = 1.0;
 const MAX_MUSCLE_GAIN_KG_PER_MONTH = 2.0;

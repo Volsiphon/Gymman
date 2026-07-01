@@ -1,3 +1,14 @@
+/**
+ * modules/plan/diet/DietScreen.tsx
+ *
+ * The Diet Plan sub-screen — the most used screen in the app. Combines three things:
+ * (1) an AI nutrition coach chat powered by nutritionCoach.ts that can add/remove/update
+ * food items via [DIET:] action commands; (2) a live food log showing today's meals and
+ * their macros; (3) a macro progress bar showing calories/protein/carbs/fats consumed
+ * vs the daily target from GoalsContext. The Kerala food library provides local food
+ * suggestions the AI can recommend by name.
+ */
+
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
@@ -30,18 +41,14 @@ import {
   type DietAction,
   type MealEntry,
 } from '@/services/ai/nutritionCoach';
-import { groqVisionChat } from '@/services/ai/client';
-import type { ChatMessage } from '@/services/ai/client';
-import { type NutritionGoals } from '@/services/storage/local/profileStorage';
+import { aiVisionChat } from '@/services/ai/client';
+import { checkImageLogAllowed, recordImageLog, checkAiMessageAllowed, recordAiMessage } from '@/services/ai/rateLimiter';
+import { useSubscription } from '@/app/providers/SubscriptionProvider';
+import type { ChatMessage, DietChat, StoredDietMessage } from '@/types/coaching';
+import type { NutritionGoals } from '@/types/user';
 import { loadTodayLog, saveTodayLog } from '@/services/storage/local/dietLogStorage';
 import { useGoals } from '@/contexts/GoalsContext';
-import {
-  loadDietChats,
-  saveDietChat,
-  deleteDietChat,
-  type DietChat,
-  type StoredDietMessage,
-} from '@/services/storage/local/dietChatStorage';
+import { loadDietChats, saveDietChat, deleteDietChat } from '@/services/storage/local/dietChatStorage';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
@@ -56,7 +63,6 @@ const ACCENT = colors.success;
 const LIME   = colors.primary;
 const BLUE   = colors.info;
 
-const DEFAULT_GOALS: NutritionGoals = { calories: 1700, protein: 130, carbs: 170, fats: 47 };
 
 const TABS = [
   { id: 'today',   icon: 'today-outline',               label: 'Today'   },
@@ -703,8 +709,19 @@ function DietCoachTab({ log, goals, onDietActions }: DietCoachProps) {
   const send = useCallback(async (overrideText?: string) => {
     const text = (overrideText ?? input).trim();
     if (!text || loading) return;
-    setInput('');
 
+    const allowed = await checkAiMessageAllowed(tier);
+    if (!allowed) {
+      Alert.alert(
+        'Daily limit reached',
+        tier === 'free'
+          ? 'Free users get 20 AI messages per day. Upgrade to Premium for much more.'
+          : "You've used today's AI message allowance. Try again tomorrow.",
+      );
+      return;
+    }
+
+    setInput('');
     const newHistory: ChatMessage[] = [...historyRef.current, { role: 'user', content: text }];
     historyRef.current = newHistory;
     setMessages(prev => [...prev, { id: uid(), role: 'user', content: text }]);
@@ -713,6 +730,7 @@ function DietCoachTab({ log, goals, onDietActions }: DietCoachProps) {
 
     try {
       const reply = await nutritionCoachChat(newHistory, logRef.current, goals);
+      await recordAiMessage();
       handleAIReply(reply);
     } catch {
       setMessages(prev => [...prev, { id: uid(), role: 'assistant', content: "Couldn't reach the server. Check your connection and try again." }]);
@@ -720,15 +738,28 @@ function DietCoachTab({ log, goals, onDietActions }: DietCoachProps) {
       setLoading(false);
       scrollToEnd();
     }
-  }, [input, loading, goals, scrollToEnd, handleAIReply]);
+  }, [input, loading, goals, tier, scrollToEnd, handleAIReply]);
 
   const sendImage = useCallback(async (asset: ImagePicker.ImagePickerAsset) => {
     if (!asset.base64) return;
+
+    const allowed = await checkImageLogAllowed(tier);
+    if (!allowed) {
+      Alert.alert(
+        'Photo scan limit reached',
+        tier === 'free'
+          ? 'Free users can scan 1 food photo per day. Upgrade to Premium for unlimited scans.'
+          : "You've reached today's photo scan limit. Resets at midnight.",
+      );
+      return;
+    }
+
     setMessages(prev => [...prev, { id: uid(), role: 'user', content: 'What food is in this photo? Log it to today.', imageUri: asset.uri }]);
     setLoading(true);
     scrollToEnd();
     try {
-      const reply = await groqVisionChat(VISION_SYSTEM, 'Identify this food and log it to today.', asset.base64, asset.mimeType ?? 'image/jpeg');
+      const reply = await aiVisionChat(VISION_SYSTEM, 'Identify this food and log it to today.', asset.base64, asset.mimeType ?? 'image/jpeg');
+      await recordImageLog();
       handleAIReply(reply);
     } catch {
       setMessages(prev => [...prev, { id: uid(), role: 'assistant', content: "Couldn't analyse the photo. Try again or describe the food instead." }]);
@@ -736,7 +767,7 @@ function DietCoachTab({ log, goals, onDietActions }: DietCoachProps) {
       setLoading(false);
       scrollToEnd();
     }
-  }, [scrollToEnd, handleAIReply]);
+  }, [tier, scrollToEnd, handleAIReply]);
 
   const openCamera = useCallback(async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -991,6 +1022,7 @@ const ht = StyleSheet.create({
 export function DietScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { goals, isDynamic } = useGoals();
+  const { tier } = useSubscription();
   const [active, setActive]         = useState<TabId>('today');
   const [log, setLog]               = useState<LogItem[]>([]);
   const [showManual, setShowManual] = useState(false);

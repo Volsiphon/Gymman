@@ -1,3 +1,12 @@
+/**
+ * app/navigation/PlanNavigator.tsx
+ *
+ * A stack navigator nested inside the Plan bottom tab. PlanScreen is the root (the hub
+ * with streak flames and section cards). Tapping a section card pushes the corresponding
+ * sub-screen (Diet, Training, CaloryBurn, Bloodwork, Review) onto this stack. All
+ * Plan sub-screens share the same header style defined in screenOptions here.
+ */
+
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { PlanScreen, PlaceholderDetailScreen } from '@/modules/plan/home';

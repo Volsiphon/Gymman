@@ -1,3 +1,12 @@
+/**
+ * engine/nutrition/target-cal.ts
+ *
+ * Applies the goal offset to TDEE to produce the daily calorie target.
+ * Fat loss = TDEE minus 500 kcal (roughly 0.5 kg/week loss).
+ * Muscle gain = TDEE plus 250 kcal (lean bulk — minimises fat gain).
+ * Recomp and non-body-comp goals stay at maintenance (TDEE).
+ */
+
 import type { BodyGoalType } from '../goal-engine/goal-classifier';
 
 const FAT_LOSS_DEFICIT   = 500; // kcal below maintenance

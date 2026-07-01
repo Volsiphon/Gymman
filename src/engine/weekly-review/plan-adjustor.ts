@@ -1,3 +1,13 @@
+/**
+ * engine/weekly-review/plan-adjustor.ts
+ *
+ * Takes the analysis from data-analyzer.ts and adjusts the user's calorie plan.
+ * The core rule: preserve the same surplus/deficit offset the user was targeting,
+ * but rebase it on the newly calibrated maintenance figure. So if maintenance turned
+ * out to be 100 kcal higher than estimated, the calorie target rises by 100 kcal —
+ * keeping the user on the same trajectory with better numbers.
+ */
+
 import type { WeeklyAnalysisResult } from './data-analyzer';
 
 export type GoalType = 'cut' | 'bulk' | 'maintain' | 'recomp';

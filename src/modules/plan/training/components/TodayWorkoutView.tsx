@@ -1,3 +1,13 @@
+/**
+ * modules/plan/training/components/TodayWorkoutView.tsx
+ *
+ * The "Today" tab inside TrainingScreen. Displays today's workout day from the
+ * active routine — exercise list with target sets/reps. For each set the user
+ * taps Done/Short/Skip. Weight fields pre-fill from exerciseWeightStorage.ts.
+ * When the user finishes the session, the log is saved via workoutStorage.ts
+ * which lights the Gym flame on PlanScreen.
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
   View,

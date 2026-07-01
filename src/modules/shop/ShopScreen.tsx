@@ -1,3 +1,13 @@
+/**
+ * modules/shop/ShopScreen.tsx
+ *
+ * The Shop bottom tab. A Shopify-style storefront for gym products curated for
+ * the Kerala market (protein powders, equipment, accessories). Uses bundled local
+ * images — no external network calls for images. Tapping a product shows a detail
+ * view with price and a "Buy" CTA. Currently no real e-commerce backend; the buy
+ * button is a placeholder for when payment integration is added.
+ */
+
 import React from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView,

@@ -1,3 +1,12 @@
+/**
+ * engine/nutrition/macros.ts
+ *
+ * Calculates protein, fat, and carb gram targets from a calorie budget and lean body mass.
+ * Protein scales with LBM (lean body mass) and the goal type — fat-loss needs more to
+ * protect muscle under a calorie deficit. Fat is fixed at 25% of total calories.
+ * Carbs fill whatever calories are left after protein and fat are allocated.
+ */
+
 import type { BodyGoalType } from '../goal-engine/goal-classifier';
 
 const CALS_PER_G_PROTEIN = 4;

@@ -1,3 +1,13 @@
+/**
+ * shared/components/CollapsibleTabBar.tsx
+ *
+ * A horizontal pill-tab bar that collapses down to show only the active tab label
+ * and expands on press to reveal all tabs. Used on every Plan sub-screen (Diet,
+ * Training, CaloryBurn, etc.) to let the user jump between sub-sections without
+ * going back to PlanScreen. Lives in shared/ because two or more unrelated Plan
+ * sub-screens use it — it is not specific to any single one.
+ */
+
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';

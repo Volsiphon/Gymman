@@ -11,6 +11,7 @@ import {
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
 import { RootNavigator } from '@/app/navigation';
+import { SubscriptionProvider } from '@/app/providers/SubscriptionProvider';
 import { colors } from '@/theme/colors';
 
 function App() {
@@ -28,9 +29,11 @@ function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <RootNavigator />
-      </NavigationContainer>
+      <SubscriptionProvider>
+        <NavigationContainer>
+          <RootNavigator />
+        </NavigationContainer>
+      </SubscriptionProvider>
     </SafeAreaProvider>
   );
 }

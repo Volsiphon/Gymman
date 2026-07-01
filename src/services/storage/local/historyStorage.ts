@@ -1,3 +1,13 @@
+/**
+ * services/storage/local/historyStorage.ts
+ *
+ * Persists a log of routine change events — any time the AI trainer modifies the
+ * user's workout plan (adds an exercise, changes sets/reps, swaps a day), an event
+ * is appended here with a timestamp and a description. The HistoryView tab in the
+ * Training screen reads this list to show the user a changelog of their routine's
+ * evolution over time.
+ */
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RoutineChangeEvent } from '@/types/plan';
 

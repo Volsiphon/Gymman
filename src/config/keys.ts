@@ -1,8 +1,16 @@
-// Fill in your Anthropic API key to enable AI goal analysis.
-// Get one at console.anthropic.com
-// Do not commit a real key — use environment variables before shipping.
-export const ANTHROPIC_API_KEY = '';
+/**
+ * config/keys.ts
+ *
+ * API key constants. Keys are read from EXPO_PUBLIC_* environment variables at
+ * build time. Add them to your .env file locally and to CI secrets in production
+ * — never paste real keys directly in this file.
+ *
+ * Tier → provider:
+ *   free    → Groq
+ *   premium → DeepSeek
+ *   ultra   → Anthropic
+ */
 
-// Groq API key for in-app chat (Coach, Diet Coach, Trainer).
-// Set EXPO_PUBLIC_GROQ_API_KEY in your .env file — never hardcode here.
-export const GROQ_API_KEY = process.env['EXPO_PUBLIC_GROQ_API_KEY'] ?? '';
+export const GROQ_API_KEY      = process.env['EXPO_PUBLIC_GROQ_API_KEY']      ?? '';
+export const DEEPSEEK_API_KEY  = process.env['EXPO_PUBLIC_DEEPSEEK_API_KEY']  ?? '';
+export const ANTHROPIC_API_KEY = process.env['EXPO_PUBLIC_ANTHROPIC_API_KEY'] ?? '';

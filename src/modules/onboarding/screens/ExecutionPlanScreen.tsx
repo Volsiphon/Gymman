@@ -1,3 +1,13 @@
+/**
+ * modules/onboarding/screens/ExecutionPlanScreen.tsx
+ *
+ * The final onboarding screen. Calls executionPlan.ts to generate a personalised
+ * training + diet guide from the user's goal analysis results, then displays it as
+ * a scrollable formatted plan. When the user taps "Start", it saves the full profile
+ * to userProfileStorage and navigates to the main app. This is the screen where the
+ * user's journey officially begins.
+ */
+
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -12,7 +22,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { OnboardingStackParamList } from '@/app/navigation';
-import { loadUserProfile, type UserProfile } from '@/services/storage/local/userProfileStorage';
+import { loadUserProfile } from '@/services/storage/local/userProfileStorage';
+import type { UserProfile } from '@/types/user';
 import {
   generateExecutionContent,
   type ExecutionContent,

@@ -1,3 +1,13 @@
+/**
+ * app/navigation/OnboardingNavigator.tsx
+ *
+ * The linear stack the user walks through before their profile exists: language
+ * selection → login → welcome → goal description → onboarding chat (physical stats
+ * collected via AI conversation) → optional photo capture → AI goal analysis →
+ * stats reveal → execution plan. Each screen is pushed in order; there is no
+ * back-navigation once stats are saved so the user can't re-enter bad data.
+ */
+
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { LanguageSelectionScreen, LoginScreen, WelcomeScreen, OnboardingChatScreen, PhotoCaptureScreen, GoalDescriptionScreen, GoalAnalysisScreen, StatsRevealScreen, ExecutionPlanScreen } from '@/modules/onboarding';

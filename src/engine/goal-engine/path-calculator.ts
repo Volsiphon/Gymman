@@ -1,3 +1,11 @@
+/**
+ * engine/goal-engine/path-calculator.ts
+ *
+ * Maths for the goal path: how many weeks to reach a target weight at a given
+ * weekly rate, and what daily calorie deficit or surplus achieves that rate.
+ * The 7700 kcal-per-kg figure is the standard energy density of body fat.
+ */
+
 // 1 kg of body fat ≈ 7700 kcal
 const KCAL_PER_KG_FAT = 7700;
 

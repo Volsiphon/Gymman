@@ -1,5 +1,18 @@
+/**
+ * services/ai/executionPlan.ts
+ *
+ * Generates the personalised execution guide shown on the ExecutionPlan screen —
+ * the last step of onboarding. By this point, UserProfile is fully populated with
+ * the goal type and macro targets, so the AI can give specific training and diet
+ * guidance tailored to this exact person rather than generic advice.
+ *
+ * Returns training (approach, phases, key focus) and diet (approach, key focus,
+ * common struggle). Each field maps to a card on the ExecutionPlan screen.
+ * buildFallback() provides sensible defaults when Groq is unavailable.
+ */
+
 import { groqChat } from './client';
-import type { UserProfile } from '@/services/storage/local/userProfileStorage';
+import type { UserProfile } from '@/types/user';
 
 export interface TrainingContent {
   approach: string;

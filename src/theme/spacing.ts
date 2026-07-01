@@ -1,3 +1,12 @@
+/**
+ * theme/spacing.ts
+ *
+ * The app's spacing and sizing system, built on a 4-point grid.
+ * Use spacing.md for card padding, spacing.screenPadding for horizontal screen edges,
+ * and radius.card / radius.button / radius.full for border radii.
+ * Never use raw pixel numbers in component StyleSheets.
+ */
+
 // All spacing and sizing on a 4-point grid.
 
 export const spacing = {

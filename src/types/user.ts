@@ -1,3 +1,14 @@
+/**
+ * types/user.ts
+ *
+ * Everything about the user: what they told us during onboarding (UserPhysicalStats),
+ * the full persisted profile with computed body composition (UserProfile), and their
+ * current nutrition targets (NutritionGoals).
+ *
+ * Also re-exports Sex, ActivityLevel, and BodyGoalType from the engine so callers
+ * have a single import path instead of reaching into engine internals.
+ */
+
 import type { Sex, ActivityLevel } from '@/engine/body-metrics';
 import type { BodyGoalType } from '@/engine/goal-engine';
 

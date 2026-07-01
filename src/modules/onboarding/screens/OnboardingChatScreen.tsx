@@ -1,3 +1,14 @@
+/**
+ * modules/onboarding/screens/OnboardingChatScreen.tsx
+ *
+ * The conversational data-collection screen. The AI coach asks the user a series of
+ * questions (age, sex, height, weight, neck/waist/hip measurements, activity level,
+ * dietary preference) via onboardingChat.ts. Each answer is parsed by statParser.ts
+ * and confirmed by onboardingCoach.ts. When all fields are collected the screen
+ * routes to GoalDescriptionScreen. This is the heart of onboarding — all body
+ * composition calculations downstream depend on the data collected here.
+ */
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
@@ -25,7 +36,7 @@ import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';
 import type { ActivityLevel, Sex, UserPhysicalStats, QuestionKey } from '@/types/user';
 import { onboardingChat, type OnboardingChatResult } from '@/services/ai/onboardingChat';
-import type { ChatMessage } from '@/services/ai/client';
+import type { ChatMessage } from '@/types/coaching';
 import { saveUserProfile } from '@/services/storage/local/userProfileStorage';
 
 type Props = {

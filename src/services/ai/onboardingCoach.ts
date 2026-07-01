@@ -1,3 +1,15 @@
+/**
+ * services/ai/onboardingCoach.ts
+ *
+ * Generates the warm coach acknowledgment reply after each onboarding answer.
+ * Separate from onboardingChat.ts because the two have different jobs:
+ *   - onboardingChat.ts:   parses what the user said and extracts the value
+ *   - onboardingCoach.ts:  writes the coach's warm, human-sounding response
+ *
+ * The screen calls both: first parse to get the value, then coach to get the reply.
+ * Also handles the off-topic reply (onboardingOffTopicReply) when the user goes sideways.
+ */
+
 import { groqChat, type ChatMessage } from './client';
 import type { UserPhysicalStats, QuestionKey } from '@/types/user';
 

@@ -1,3 +1,12 @@
+/**
+ * app/navigation/MainTabNavigator.tsx
+ *
+ * The five-tab bottom navigation bar the user sees after onboarding: Plan, Progress,
+ * Coach, Photos, Shop. This file also wraps the whole navigator in GoalsContextProvider
+ * so every tab can read or update the live calorie target without prop-drilling.
+ * Tab bar styling (background, active/inactive tint, icon sizes) is all defined here.
+ */
+
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';

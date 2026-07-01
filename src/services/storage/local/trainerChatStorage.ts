@@ -1,8 +1,15 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { SavedChatMessage, SavedChat } from '@/types/coaching';
+/**
+ * services/storage/local/trainerChatStorage.ts
+ *
+ * Persists saved trainer chat sessions. Each SavedChat is a named conversation
+ * thread where the user built or modified a workout routine with the AI trainer.
+ * Up to 50 chats are kept. The Training screen lists these so the user can
+ * pick up any past coaching session and continue from where they left off.
+ */
 
-// SavedChatMessage and SavedChat are now defined in @/types/coaching — re-exported here for backwards compatibility.
-export type { SavedChatMessage, SavedChat } from '@/types/coaching';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { SavedChat } from '@/types/coaching';
+
 
 const KEY = '@gymman:trainerChats';
 const MAX_CHATS = 25;

@@ -1,8 +1,19 @@
+/**
+ * services/storage/local/userProfileStorage.ts
+ *
+ * Persists the user's full profile as a single JSON blob keyed by 'gymman_user_profile'.
+ * This is the most important storage file — the profile is the foundation that all AI
+ * coaches and body composition calculations are built on.
+ *
+ * saveUserProfile() does a shallow merge, so you can update one field (e.g. a new
+ * calorie target after a weekly review) without losing everything else.
+ * profileToStats() converts a full UserProfile back to the leaner UserPhysicalStats
+ * shape used by the body-metrics engine.
+ */
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { UserProfile, UserPhysicalStats } from '@/types/user';
 
-// UserProfile is now defined in @/types/user — re-exported here for backwards compatibility.
-export type { UserProfile } from '@/types/user';
 
 const KEY = 'gymman_user_profile';
 

@@ -1,3 +1,13 @@
+/**
+ * modules/plan/bloodwork/BloodworkScreen.tsx
+ *
+ * The Bloodwork tracker — a Plan stack screen (not a bottom tab) reached by tapping
+ * the Bloodwork button on PlanScreen. Lets the user log blood panel results manually
+ * (HbA1c, testosterone, cholesterol, etc.) and view historical trends as charts.
+ * The most recent bloodwork snapshot is fed into the Master Coach's system prompt
+ * so it can factor blood health into its advice.
+ */
+
 import React, { useState, useCallback } from 'react';
 import {
   View,

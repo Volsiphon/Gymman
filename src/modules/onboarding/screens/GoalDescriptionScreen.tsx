@@ -1,3 +1,13 @@
+/**
+ * modules/onboarding/screens/GoalDescriptionScreen.tsx
+ *
+ * A free-text input screen where the user types their fitness goal in their own
+ * words (e.g. "I want to lose 10 kg before my wedding in 3 months"). This raw
+ * text is fed into GoalAnalysisScreen so the AI can interpret it in the context
+ * of the user's actual body stats. No dropdown or preset options — natural language
+ * only, so the AI can catch nuance like timelines and motivation.
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,

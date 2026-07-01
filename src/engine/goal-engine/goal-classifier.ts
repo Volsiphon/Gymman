@@ -1,3 +1,12 @@
+/**
+ * engine/goal-engine/goal-classifier.ts
+ *
+ * Reads the user's free-text fitness goal and classifies it into one of five types.
+ * This classification drives the entire nutrition plan — which calorie formula to use,
+ * how to set protein targets, and what the AI coaches emphasise in their responses.
+ * Keyword scoring is used first; body fat is the tie-breaker when the text is ambiguous.
+ */
+
 // BodyGoalType covers all possible goal outcomes from a user's free-text description.
 export type BodyGoalType =
   | 'fat-loss'

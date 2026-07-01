@@ -1,3 +1,19 @@
+/**
+ * engine/weekly-review/data-analyzer.ts
+ *
+ * The core of the 7-day weekly review feature. Takes a full week of diet logs and
+ * weight entries, then works out:
+ *   - What calories were actually consumed vs. the goal
+ *   - Whether weight changed as the calories would predict, or if something's off
+ *   - Whether the discrepancy looks like water retention (scale moved the wrong way)
+ *   - What the user's real maintenance calories appear to be (reverse-engineered from
+ *     actual weight change vs. calories eaten)
+ *   - An updated maintenance estimate blended with the prior estimate
+ *
+ * The calibrated maintenance estimate is the key output — it feeds plan-adjustor.ts
+ * which then nudges the user's daily calorie target to match their real metabolism.
+ */
+
 // 1 kg of body fat ≈ 7700 kcal
 const KCAL_PER_KG = 7700;
 

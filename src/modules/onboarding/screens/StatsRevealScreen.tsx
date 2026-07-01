@@ -1,3 +1,13 @@
+/**
+ * modules/onboarding/screens/StatsRevealScreen.tsx
+ *
+ * Displays the computed body composition results to the user after goal analysis:
+ * BMR, TDEE, body fat %, lean mass, BMI, and the recommended calorie target with
+ * macro split. Data comes from the engine/body-metrics and engine/nutrition layers
+ * via a computeBodyStats() call. This is a reveal/celebration screen — the user
+ * sees their numbers for the first time here before moving on to ExecutionPlanScreen.
+ */
+
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -19,7 +29,7 @@ import type { BodyCompositionStats } from '@/engine/body-metrics';
 import { classifyGoal } from '@/engine/goal-engine';
 import { calcCalorieTarget, calcMacros } from '@/engine/nutrition';
 import { loadUserProfile, profileToStats, saveUserProfile } from '@/services/storage/local/userProfileStorage';
-import type { UserProfile } from '@/services/storage/local/userProfileStorage';
+import type { UserProfile } from '@/types/user';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
 import { spacing, radius } from '@/theme/spacing';

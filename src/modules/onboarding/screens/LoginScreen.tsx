@@ -1,3 +1,13 @@
+/**
+ * modules/onboarding/screens/LoginScreen.tsx
+ *
+ * STUB screen — not yet backed by real auth. Currently shows a login UI but skips
+ * straight to WelcomeScreen without authenticating anyone. When authService.ts is
+ * implemented, this screen will call it to sign in or create an account. Kept in
+ * the navigator now so the flow is complete and auth can be wired in later without
+ * restructuring the navigation tree.
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,

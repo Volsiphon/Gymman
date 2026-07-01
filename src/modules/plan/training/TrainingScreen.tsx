@@ -1,3 +1,14 @@
+/**
+ * modules/plan/training/TrainingScreen.tsx
+ *
+ * The Training Plan sub-screen — the orchestrator for the full workout feature.
+ * Renders three tab views (controlled by CollapsibleTabBar): TrainerIntroView
+ * (where the AI builds the routine via chat), TodayWorkoutView (where the user
+ * logs today's sets and reps), and HistoryView (where they see the routine
+ * changelog). Loads the current routine from planStorage.ts on focus and passes
+ * it down as props to each sub-view.
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

@@ -1,3 +1,13 @@
+/**
+ * modules/onboarding/screens/LanguageSelectionScreen.tsx
+ *
+ * The very first onboarding screen. Lets the user pick their preferred language:
+ * English, Malayalam, or Manglish (Malayalam written in English letters). The
+ * choice is saved to AsyncStorage and will eventually drive i18n string translation
+ * across the whole app. Currently the app shows English regardless; the selection
+ * is stored but not yet applied.
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
